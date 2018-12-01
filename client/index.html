@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+
+
+<head>
+    <meta charset="utf-8">
+    <title>A Cool Name</title>
+
+    <link rel='stylesheet' href='index.css'>
+</head>
+
+<body>
+    <div id = 'space'>
+
+        <div id = 'gameOver'>
+                <div id = 'message'></div>
+                <button id = 'backButton'>Back</button>
+        </div>
+        
+
+        <div id='game'>
+            <canvas id="gameCanvas" oncontextmenu = "return false;"></canvas>
+
+            <div id='stats'>
+                <!--
+                <div id = 'health'>
+                    <div id = 'healthbar'></div>
+                </div>should stats like health be html elements or on canvas?
+            -->
+            </div>
+        </div>
+
+        
+        <div id='home'>
+            <div id='config'>
+
+                <form action="" id='form' method='POST' novalidate>
+                    <fieldset>
+                        <legend>haha</legend>
+                        Name:<br>
+                        <input type="text" name="name" value="A Poor Boy">
+                        <br>
+                        <label for='color'>Color:</label><br>
+                        <input type="color" name="color" value="#F8C574">
+                        <br>
+                    </fieldset>
+                    
+                    Left-Hand Weapon:<br>
+                    <select name = 'lWeapon'>
+                        <option value='fist'>Fist</option>
+                        <option value='dagger'>Dagger</option>
+                        <option value='katana'>katana</option>
+                        <option value='machineGun'>Machine Gun</option>
+                        <option value='launcher'>Launcher</option>
+                        <option value='jellyBelly'>Jelly Belly</option>
+                    </select>
+                    <br>
+                    Right-Hand Weapon:<br>
+                    <select name = 'rWeapon'>
+                        <option value='fist'>Fist</option>
+                        <option value='dagger'>Dagger</option>
+                        <option value='katana'>katana</option>
+                        <option value='machineGun'>Machine Gun</option>
+                        <option value='launcher'>Launcher</option>
+                        <option value='jellyBelly'>Jelly Belly</option>
+                    </select>
+                    <br><br>
+                    <input class = 'homeButtons' type="submit" value="Play">
+                </form> 
+            </div>
+        
+            <div id = 'combatStats'>
+                Shield: <span id = shield>0</span><br><br>
+                Speed: <span id = speed>300</span><br><br>
+                Vision: <span id = vision>1</span><br> 
+
+            </div>
+        </div>
+    </div>
+    
+    <script src = "mersenneTwister.js"></script>
+    <script src = "../shared/types.js"></script>
+    <script src = "../shared/weapons.js"></script>
+    <script src = "../shared/fires.js"></script>
+    <script src = "../shared/landscape.js"></script>
+    <script src = "../shared/game.core.js"></script>
+    <script src = "../shared/helpers.js"></script>
+    <script src = "client.js"></script>
+
+</body>

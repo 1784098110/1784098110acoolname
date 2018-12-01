@@ -1,0 +1,15 @@
+{
+  "name": "shucks",
+  "author" : "Clark",
+  "description": "?-?",
+  "version": "1.0.0",
+  "dependencies": {
+    "express": "4.16.x",
+    "uws": "9.148.x",
+    "mersenne-twister":"1.1.x",
+    "url": "0.11.x"
+  },
+  "engine": {
+    "node": "8.10.x"
+  }
+}
