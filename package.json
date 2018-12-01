@@ -4,7 +4,7 @@
   "description": "?-?",
   "version": "1.0.0",
   "dependencies": {
-    "express": "4.16.x",
+    "express": ">=3.11.0",
     "uws": "9.148.x",
     "mersenne-twister":"1.1.x",
     "url": "0.11.x"
