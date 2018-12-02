@@ -262,7 +262,7 @@
   game_core.prototype.createFID = function(){//fires
     
     if(this.server){
-      if(this.fidCounter > 3000){//todo. find the right max id
+      if(this.fidCounter > 3000){//todo. find the right max id. also should be different on client and server
         this.fidCounter = 0;
       }
       return this.fidCounter++;
@@ -1406,6 +1406,7 @@
   game_core.prototype.client_update = function() {
 
     //todo. scale 
+    const upperGround = this.self.upperGround;
     const ctx = this.ctx;
     const xView = this.camera.xView;
     const yView = this.camera.yView;
@@ -1420,7 +1421,7 @@
       //Clear the screen area
     ctx.clearRect(0, 0, width, height);
     
-    this.map.drawBackground(ctx, xView, yView, width, height, scale);
+    this.map.drawBackground(ctx, xView, yView, width, height, scale, upperGround, subGridX, subGridY, subGridXMax, subGridYMax);
   
       //Capture inputs from the player
     this.client_handle_input();
@@ -1434,10 +1435,10 @@
       //this.client_process_net_updates();
     }
 
-    //first draw fires
-    this.fires.forEach((fire) => {
-      fire.draw(ctx, xView, yView, scale); 
-    });
+    //draw fires. because server only notifies of relevant fires. no need to use graphic grid here
+    this.fires.forEach(fire => {
+      fire.draw(ctx, xView, yView, scale);
+    })
     //if(debug) console.log('client update: players(other) length: ' + this.currPlayersID.length);
     
     //draw players including self
@@ -1449,12 +1450,10 @@
     this.drawObstacles(ctx, xView, yView, scale, subGridX, subGridY, subGridXMax, subGridYMax);
 
     //player map, mini map and stats don't care about scale. 
-    //draw player map on top if it's open
     if(this.showMap) this.drawPlayerMap(ctx, width, height);
 
     //always draw minimap
     this.drawMiniMap(ctx, width, height);
-
 
     //draw stats
     this.drawStats(ctx, width, height);
@@ -1469,16 +1468,29 @@
   
   }; //game_core.update_client
 
+  //?? iterating through same gridsg two times to draw zones and obstacles separately. anyway to optimize?
   //only draw ones in graphic grids occupied by the viewport
   game_core.prototype.drawObstacles = function(context, xView, yView, scale, subGridX, subGridY, subGridXMax, subGridYMax){
     
-    //todotodo.
-    //draw background and zones as you go. 
-    //draw game canvas on itself in response to moving and then draw the new section to optimize?
-    //let camera update set subgrid range and store in game cellsg??
+    /**
+     * todotodo.
+     * groundlevel change
+     * destructible obstacle
+     */
+    /**
+     * ??
+     * Draw game canvas on itself in response to moving and then draw the new section to optimize?
+     * Should obstacles to draw also be dictated by servers? that would cost bandwidth, 
+     * but would it increase client performance since on need to iterate graphic grid?
+     * Is it a better idea to split each cellg into lists by obj type or just iterate through all and draw right ones? 
+     * also since fires and entites to draw are dictated by servers should they just not be in graphic grid on client side?
+     * Does index affect performance? how to utilize typed arrays?
+     * 
+     */
+    
     const gList = Game.enums.GList.obstacle;
     const obstacles = this.obstacles;
-    const grid = this.map.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
+    const grid = this.self.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
     const drawn = [];
 
     //iterating occupied logic grid to get relevant obstacles to draw

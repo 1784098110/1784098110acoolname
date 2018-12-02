@@ -18,13 +18,7 @@
     this.cellSize = cellSize;
     this.gridW = (this.width / this.cellSize);
     if(debug) console.assert(this.gridW % 1 === 0);//should fit just right
-    
-    //magic number. 10000 is maximum single canvas size on firefox. todo. make sure fits all browsers
-    const maxCanvasSize = 5000;
-    this.subWidth = (this.width > maxCanvasSize) ? maxCanvasSize : this.width;
-    this.backDivide = (this.width / this.subWidth);
-    if(debug) console.assert(this.width % this.subWidth === 0 && this.backDivide % 1 === 0);//should fit just right
-
+  
     this.graphicToLogic = 5;//how many logic grid make up for one graphic grid
     this.cellSizeg = this.cellSize * this.graphicToLogic;
     this.gridWg = this.gridW / this.graphicToLogic;
@@ -35,20 +29,28 @@
     this.gridUnder = [];
     this.zoneGridUpper = [];//all zones
     this.zoneGridUnder = [];
-    this.gridgUpper = [];//for object graphics only
+    this.gridgUpper = [];//for all graphics
     this.gridgUnder = [];
-    this.zoneGridgUpper = [];//for zone and background graphics only
-    this.zoneGridgUnder = [];
 
-    this.zones = new Map();
+    this.zones = new Map();//zones need to be identified. ?? do they really?
 
-    this.upperGround = true;//client only. identify which ground level to draw
     this.upperBackground;// background textures
     this.underBackground;
 
     //all zones and objects have ids
     this.zidCounter = 0;
     this.jidCounter = 0;
+
+    //graphics
+    //todo. these should be decided based on map type
+    this.upperBackColor = 'rgb(160, 160, 160)';
+    this.upperOutColor = 'rgb(140, 140, 140)'
+    this.upperLineColor = 'white';
+    this.underBackColor = 'rgb(30, 30, 30)';
+    this.underOutColor = 'black';
+    this.underLineColor = 'white';
+    this.actualLineOpacity = 0.2;
+    this.actualLineWidth = 2;
     
     const graphicRatio = this.graphicToLogic;
     let ig, jg, graphicGrid;
@@ -64,8 +66,6 @@
         graphicGrid = true;
         this.gridgUpper[ig] = [];
         this.gridgUnder[ig] = [];
-        this.zoneGridgUpper[ig] = [];
-        this.zoneGridgUnder[ig] = [];
       }
       for(let j = 0; j < w; j++){//always a square map so j limit == i limit
         //split each grid cell into lists by object/zone type to reduce iterations
@@ -77,8 +77,6 @@
           jg = j / graphicRatio;
           this.gridgUpper[ig][jg] = [[], [], [], []];
           this.gridgUnder[ig][jg] = [[], [], [], []];
-          this.zoneGridgUpper[ig][jg] = [[], [], [], []];
-          this.zoneGridgUnder[ig][jg] = [[], [], [], []];
         }
       }
     }
@@ -116,8 +114,8 @@
     obj.gList = Game.enums.GList.zone;
     const gList = Game.enums.GList.zone;
 
-    let grid, gridg;
-    [grid, gridg] = (obj.upperGround === true) ? [this.zoneGridUpper, this.zoneGridgUpper] : [this.zoneGridUnder, this.zoneGridgUnder];
+    let grid, gridg;//logic grid has zone and objects separated. but combined in graphic grid
+    [grid, gridg] = (obj.upperGround === true) ? [this.zoneGridUpper, this.gridgUpper] : [this.zoneGridUnder, this.gridgUnder];
 
     obj.zID = this.createZID();//?? but zones are split into two different lists. 
     this.zones.set(obj.zID, obj);
@@ -213,7 +211,8 @@
     let grid, gridg;
     [grid, gridg] = (obj.upperGround === true) ? [this.gridUpper, this.gridgUpper] : [this.gridUnder, this.gridgUnder];
 
-    obj.jID = this.createJID();
+    //should fires not get universal id because there are so many of them ?? or does it not matter? 
+    if(obj.fID === undefined) obj.jID = this.createJID();
 
     //if(debug && !obj.upperGround) console.log('map addobject: obj upperground: ' + obj.upperGround);
 
@@ -376,6 +375,7 @@
 
     const grid = (obj.upperGround === true) ? this.gridUpper : this.gridUnder;
     const lastCheck = [];
+    const lastCheckFire = [];
 
     //check for collision with all objects in ocupied cells
     const cells = obj.cells;
@@ -387,11 +387,13 @@
       for(let j = 0, length = inhabs.length; j < length; j++){
         const inhab = inhabs[j];
 
-        //no need to check twice the same obj
+        if(inhab.fID !== undefined) continue;//fires can not yet be the object of collide. they are subjects
+        
+        //no need to check twice the same obj. since fires don't have jids check separately
         if(lastCheck[inhab.jID]) continue;
         lastCheck[inhab.jID] = true;
 
-        if(inhab.jID === obj.jID) continue;//self don't count
+        if(inhab.jID === obj.jID) continue;//self don't count, don't worry about fire because they can't be the object here
         if(!inhab.passable && !(inhab.name && obj.name)) {//players pass each other
           //if(debug && obj.name) console.log('other upperGround: ' + inhabs[j].upperGround);
           //if(debug) console.assert(inhabs[j].upperGround === obj.upperGround);
@@ -464,7 +466,8 @@
       for(let j = 0, length = inhabs.length; j<length; j++){
         const inhab = inhabs[j];
 
-        //no need to check twice the same obj
+        //no need to check twice the same obj. fires should not exist when this function is called
+        if(debug) console.assert(inhab.jID !== undefined);
         if(lastCheck[inhab.jID]) continue;
         lastCheck[inhab.jID] = true;
 
@@ -488,27 +491,14 @@
   //generate and save backgrounds/player maps as canvases to be drawn on to main canvas
 	Land.prototype.render = function (obstacles) {//player map and obstacles belong to core, have to pass in
 
-    //todo. should decide colors based on background type
-    const upperBackColor = 'gray';
-    const upperLineColor = 'white';
-    const underBackColor = 'rgb(30, 30, 30)';
-    const underLineColor = 'white';
-    const actualLineOpacity = 0.3;
-    const actualLineWidth = 2;
+    const upperBackColor = this.upperBackColor;
+    const upperLineColor = this.upperLineColor;
     const miniLineOpacity = 0.5;
     const miniLineWidth = 1;
     const width = this.width;
     const cellSize = this.cellSize;
     const graphicCellSize = cellSize * this.graphicToLogic;
-    const backDivide = this.backDivide;//factor to divide background by to accomodate large size. make it dynamic?
-    const subWidth = this.subWidth;
-    const subGridW = subWidth / cellSize;//should not need rounding
 
-    //if(debug) console.log(`land render: width: ${width} backdivide: ${backDivide} subwidth: ${subWidth} subGridW: ${subGridW}`);
-    if(debug) console.assert(subGridW);
-    if(debug) console.assert(subWidth % graphicCellSize === 0);//should fit just right
-
-    
     //player map, generated by map but belongs to core
     const upperMap = document.createElement('canvas');//to be returned to core
     const ctxMini = upperMap.getContext('2d');
@@ -550,170 +540,74 @@
       //if(debug) console.log(`render obstacles: obstacles length: ${obstacles.size} x: ${obj.x} y: ${obj.y}`);
       obj.draw(ctxMini, 0, 0, miniScale);
     });
-    
-
-    //actual background, split into four canvases to accomodate large size
-    //?? should zones be part of background? 
-    this.upperBackground = [];
-    this.underBackground = [];
-    for(let c = 0; c < backDivide; c++){
-      this.upperBackground[c] = [];
-      this.underBackground[c] = [];
-      for(let r = 0; r < backDivide; r++){
-        
-        //Upperground
-        this.upperBackground[c][r] = document.createElement('canvas');
-        const ctxUpper = this.upperBackground[c][r].getContext('2d');
-        ctxUpper.canvas.width = subWidth;
-        ctxUpper.canvas.height = subWidth;
-        //const start0 = Date.now();
-        //basic backdrop
-        ctxUpper.save();
-        ctxUpper.fillStyle = upperBackColor;
-        ctxUpper.strokeStyle = upperLineColor;
-        ctxUpper.fillRect(0, 0, subWidth, subWidth);
-        ctxUpper.globalAlpha = actualLineOpacity;
-        ctxUpper.lineWidth = actualLineWidth;
-        ctxUpper.beginPath();
-        for (let x = 0; x < subWidth; x += graphicCellSize) {
-          ctxUpper.moveTo(x, 0);
-          ctxUpper.lineTo(x, subWidth);
-        }
-        for (let y = 0; y < subWidth; y += graphicCellSize) {
-          ctxUpper.moveTo(0, y);
-          ctxUpper.lineTo(subWidth, y);
-        }
-        ctxUpper.stroke();
-        ctxUpper.closePath();
-        ctxUpper.restore();
-
-        //Underground
-        this.underBackground[c][r] = document.createElement('canvas');
-        const ctxUnder = this.underBackground[c][r].getContext('2d');
-        ctxUnder.canvas.width = subWidth;
-        ctxUnder.canvas.height = subWidth;
-        //const start0 = Date.now();
-        //basic backdrop
-        ctxUnder.save();
-        ctxUnder.fillStyle = underBackColor;
-        ctxUnder.strokeStyle = underLineColor;
-        ctxUnder.fillRect(0, 0, subWidth, subWidth);
-        ctxUnder.globalAlpha = actualLineOpacity;
-        ctxUnder.lineWidth = actualLineWidth;
-        ctxUnder.beginPath();
-        for (let x = 0; x < subWidth; x += graphicCellSize) {
-          ctxUnder.moveTo(x, 0);
-          ctxUnder.lineTo(x, subWidth);
-        }
-        for (let y = 0; y < subWidth; y += graphicCellSize) {
-          ctxUnder.moveTo(0, y);
-          ctxUnder.lineTo(subWidth, y);
-        }
-        ctxUnder.stroke();
-        ctxUnder.closePath();
-        ctxUnder.restore();
-
-        //if(debug)console.log(`upperBackground render time: ${Date.now() - start0}`);
-        //zones are permanent part of background, ?? should they be?
-        //only draw visible zones on one particular subBackground, decide based on spacial grid
-        const subX = c * subWidth;
-        const subY = r * subWidth;
-        //set bound for the current one subgrid
-        const subGridX = (subX / cellSize);//should not need rounding
-        const subGridY = (subY / cellSize);
-        const subGridXMax = (subGridX + subGridW) < this.gridW ? (subGridX + subGridW) : this.gridW;
-        const subGridYMax = (subGridY + subGridW) < this.gridW ? (subGridY + subGridW) : this.gridW;
-        const zonesDrawnUpper = [];
-        const zonesDrawnUnder = [];
-
-        //if(debug) console.log(`land render subback: subX: ${subX} subY: ${subY} subgridX: ${subGridX} subGridy: ${subGridY} subgridXmax: ${subGridXMax} subGridymax: ${subGridYMax}`);
-
-        if(debug) console.assert(subGridX % 1 === 0);//should be no decimal
-
-        //?? more efficient to iterate overe all zones after all subbacks finished and draw to subbacks as fit?
-        //iterating occupied logic grid to get relevant zones to draw
-        for(let i = subGridX; i < subGridXMax; i++){
-          for(let j = subGridY; j < subGridYMax; j++){
-            //draw upper and under in the same loop
-            const zonesUpper = this.zoneGridUpper[i][j];
-            zonesUpper.forEach(zone => {
-              if(zonesDrawnUpper[zone.zID]) return;//if already drawn
-
-              zone.draw(ctxUpper, subX, subY, 1);
-              zonesDrawnUpper[zone.zID] = true;
-            });
-
-            const zonesUnder = this.zoneGridUnder[i][j];
-            zonesUnder.forEach(zone => {
-              if(zonesDrawnUnder[zone.zID]) return;//if already drawn
-
-              zone.draw(ctxUnder, subX, subY, 1);
-              zonesDrawnUnder[zone.zID] = true;
-            });
-          }
-        }
-
-      }
-    }
 
     return upperMap; //player map belongs to core
   }
 	// draw the map background adjusted to camera
-	Land.prototype.drawBackground = function (context, xView, yView, wView, hView, scale) {
-    //todo. the subgrid here is not the graphic subgrid but its own background grid. simplify
-		//?? draw zones here as separate entities?
-    const backgroundGrid = (this.upperGround) ? this.upperBackground : this.underBackground;
-    const cellSize = this.subWidth;//assume square map
-    //don't get out of bound
-    const xViewEnd = xView + wView;
-    const yViewEnd = yView + hView;
-    const subGridX = (xView > 0) ? ~~(xView / cellSize) : 0;
-    const subGridY = (yView > 0) ? ~~(yView / cellSize) : 0;
-    const subGridXMax = (xViewEnd < this.width) ? Math.ceil((xViewEnd) / cellSize) : this.backDivide;//todo. should scale
-    const subGridYMax = (yViewEnd < this.height) ? Math.ceil((yViewEnd) / cellSize) : this.backDivide;
+	Land.prototype.drawBackground = function (context, xView, yView, wView, hView, scale, upperGround, subGridX, subGridY, subGridXMax, subGridYMax) {
+    
+    //first paint back color
+    context.fillStyle = upperGround ? this.upperBackColor : this.underBackColor;
+    context.fillRect(0, 0, wView, hView);
+    
+    //draw relevant zones
+    const gList = Game.enums.GList.zone;
+    const grid = upperGround ? this.gridgUpper : this.map.gridgUnder;
+    const drawn = [];
 
-    /*let debug0 = false;//debug tool
-    if(debug && (subGridXMax - subGridX > 1) || (subGridYMax - subGridY > 1)){
-      if(debug) console.log(`drawbackground: xview: ${xView} yView: ${yView} xViewEnd: ${xViewEnd} yViewEnd: ${yViewEnd} subgridX: ${subGridX} subGridy: ${subGridY} subgridXmax: ${subGridXMax} subGridymax: ${subGridYMax}`);
-      debug0 = true;
-    }*/
-  
-    //drawing background
-    let sx, sy, background;
-    let sWidth, sHeight, dWidth, dHeight;
-    const dx = 0; 
-    const dy = 0;
-
+    //iterating occupied logic grid to get relevant obstacles to draw
     for(let i = subGridX; i < subGridXMax; i++){
       for(let j = subGridY; j < subGridYMax; j++){
-        if(debug && (!backgroundGrid[i] || !backgroundGrid[i][j])) console.log(`drawBackground: backgroundGrid: i: ${i} j: ${j}`);
-        background = backgroundGrid[i][j];
+        //if(debug && grid[i][j][gList].length > 0) console.log(`draw obstacles gridg[i][j] length: ${grid[i][j][gList].length} i: ${i} j: ${j} subgirdX: ${subGridX} subgridy: ${subGridY} subgirdXmax: ${subGridXMax} subgridymax: ${subGridYMax} `);
 
-        // offset point to crop the image
-        sx = xView - i * cellSize;
-        sy = yView - j * cellSize;
+        //draw upper and under in the same loop
+        if(debug && (!grid[i] || !grid[i][j])) console.log(`drawObstacles: grid: i: ${i} j: ${j}`);
+        grid[i][j][gList].forEach(obj => {
+          if(debug) console.assert(obj.zID !== undefined);
+          if(drawn[obj.zID]) return;//if already drawn
 
-        // dimensions of cropped image			
-        sWidth = wView;
-        sHeight = hView;
-
-        // if cropped image is smaller than canvas we need to change the source dimensions
-        if (background.width - sx < sWidth) {
-          sWidth = background.width - sx;
-        }
-        if (background.height - sy < sHeight) {
-          sHeight = background.height - sy;
-        }
-
-        // match destination with source to not irregularly scale the image. 
-        dWidth = sWidth;
-        dHeight = sHeight;
-        
-        if(debug) console.assert(background);
-        //if(debug && debug0) console.log('Land.draw: sx = ' + sx + ' sy = ' + sy + ' sWidth = ' + sWidth + ' sHeight = ' + sHeight + ' dx = ' + dx + ' dy = ' + dy + 'dWidth = ' + dWidth + ' dHeight = ' + dHeight);
-        
-        context.drawImage(background, sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight);
+          obj.draw(context, xView, yView, scale);
+          drawn[obj.zID] = true;
+        });
       }
+    }
+
+    //draw lines
+    const graphicCellSize = this.cellSize * this.graphicToLogic;
+    const offsetX = -xView % graphicCellSize;
+    const offsetY = -yView % graphicCellSize;
+    context.save();
+    context.strokeStyle = upperGround ? this.upperLineColor : this.underLineColor;
+    context.globalAlpha = this.actualLineOpacity;
+    context.lineWidth = this.actualLineWidth;
+    context.beginPath();
+    for (let x = offsetX; x < wView; x += graphicCellSize) {
+      context.moveTo(x, 0);
+      context.lineTo(x, hView);
+    }
+    for (let y = offsetY; y < hView; y += graphicCellSize) {
+      context.moveTo(0, y);
+      context.lineTo(wView, y);
+    }
+    context.stroke();
+    context.closePath();
+    context.restore();
+
+    //draw area outside world boundary
+    context.fillStyle = upperGround ? this.upperOutColor : this.underOutColor;
+    if(xView < 0){
+      context.fillRect(0, 0, Math.abs(xView), hView);
+    }
+    else if(xView + wView > this.width){
+      const wOut = xView + wView - this.width;
+      context.fillRect(wView - wOut, 0, wOut, hView);
+    }
+    if(yView < 0){
+      context.fillRect(0, 0, wView, Math.abs(yView));
+    }
+    else if(yView + hView > this.height){
+      const hOut = yView + hView - this.height;
+      context.fillRect(0, hView - hOut, wView, hOut);
     }
   }
 
