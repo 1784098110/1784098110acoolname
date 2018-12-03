@@ -1393,7 +1393,7 @@
           if(!obj) return;//object might not exist anymore
 
           obj.health = instance.health;
-          obj.updateStats();
+          //obj.updateStats(); right now update stats only update health so no need to call on client
           if(debug) console.log(`server obj update: health: ${obj.health}`);
 
           //if it's part of obstacle update obstacle
