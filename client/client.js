@@ -230,7 +230,7 @@ window.onload = function(){
 		e.preventDefault();
 		e.stopPropagation();
 		
-		if(debug) console.log(`mouse pos to map: x: ${game.camera.xView + game.controls.mouseX} y: ${game.camera.yView + game.controls.mouseY} self x: ${game.self.x} y: ${game.self.y} `)
+		//if(debug) console.log(`mouse pos to map: x: ${game.camera.xView + game.controls.mouseX} y: ${game.camera.yView + game.controls.mouseY} self x: ${game.self.x} y: ${game.self.y} `)
 
 		if(e.button === 0)game.controls.lClick = false;
 		else if(e.button === 2)game.controls.rClick = false;	

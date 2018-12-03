@@ -5,7 +5,7 @@
     
     if(debug) console.assert(player.pID !== undefined);
 
-    Game.Gobject.call(this, x, y, shape, angle, passable || true);
+    Game.Gobject.call(this, x, y, shape, angle, passable || true, undefined, undefined);
 
     this.wType = wType;
     this.gList = Game.enums.GList.fire;
@@ -27,6 +27,9 @@
 
     this.terminate = false; //0 means unrelated to time, -1 means to be removed, other positive numbers mean life time in millisecs
     this.lastTime = Date.now();
+
+    //array that belongs to core that stores ids of objects who need to update stats
+    this.toUpdateStatsObjects;//server only
 
     //todo. too inelegant way to give fire a shape. how???
     //give fire necessary attributes based on passed in shape since it can't just inherit the shape due to its dynamic shape
@@ -70,7 +73,7 @@
     //check for actual collision depending on self and other shapes
     switch(othShape){
 
-      //doesn't do anything when hit a rectangle for now
+      //if other is rec
       case (Game.enums.Shape.rectangle):
         switch(this.shape){
           case (Game.enums.Shape.circle):
@@ -103,7 +106,7 @@
           }break;
         } break;
 
-      //do nothing for now if it's another point
+      //if other is point
       case (Game.enums.Shape.point):
       switch(this.shape){
         case (Game.enums.Shape.circle): 
@@ -121,7 +124,7 @@
         }break;
       }  break;
 
-      //do nothing for now if it's a line
+      //if other is line
       case (Game.enums.Shape.line):
       switch(this.shape){
         case (Game.enums.Shape.circle): 
@@ -142,38 +145,44 @@
     }
     //handle collision if collide
     if(collide){
-      if(other.shape === Game.enums.Shape.circle && other.health){//if other has health and is circle meaning character
-        this.handleCharacterCollide(other);
+      if(other.health){//if other has health do dmg
+        this.handleDmgCollide(other);
       }
-      else if(other.fID === undefined){//not a fire meaning it's a obstacle
-        if(!other.passable && this.hitOnce) this.terminate = true;//so kill fire if it hits once
-      }
+      if(debug) console.assert(!other.passable);//passables should not be passed in
+      if(this.hitOnce) this.terminate = true;//kill fire if hitonce
     }
 
 
   }
-  Fire.prototype.handleCharacterCollide = function(other){
-    if(this.terminate) return;
-    if(other.tID === this.tID) return;
+  Fire.prototype.handleDmgCollide = function(other){
+    if(this.terminate) return;//terminate is decided and handled outside of this funciton.
+    if(other.tID === this.tID) return;//don't hurt if on the same team. obstacles don't have tid
 
     //if(debug) console.log('fire: hitonce: ' + this.hitOnce + ' hurtOnce: ' + this.hurtOnce + ' passable: ' + this.passable + ' hit: ' + this.hit);
     //if(debug) console.log('fire handle character collide: this tID: ' + this.tID + ' other tID: ' + other.tID);
     
-    if(this.hitOnce) this.terminate = true;//disapears at collission if config says so. ?? should fire pass through teammates
+    //if already handled this obj's dmg, don't hit multiple times
     if(!this.hitOnce && this.hurtOnce){
-      if(this.hit.includes(other.pID)) return;
-      else this.hit.push(other.pID);
-    } //todo. hurtonce is checking only pID, need to include AI etc.
+      if(this.hit.includes(other.jID)) return;
+      else this.hit.push(other.jID);
+    }
 
     if(debug) console.assert(this.pID !== undefined);
     
     other.dmgs.push({pID: this.pID, dmg: this.dmg, wType: this.wType});//add dmg object to be processed by the receiver on its update
     
-    //if(debug) console.log('fire hits character: fId: ' + this.fID + ' pid: ' + other.pID + ' other.health: ' + other.health);   
+    if(other.name === undefined){//if other is not a player, need to put it on update stats list
+      if(debug) console.assert(other.jID !== undefined);//should only have objs
+      //if(debug) console.log('fire hits obj: fId: ' + this.fID + ' other.jid: ' + other.jID + ' other.health: ' + other.health);   
+
+      this.toUpdateStatsObjects.push(other.jID);//tell core to update other's stats
+    }
+
+    //if(debug) console.log('fire hits obj: fId: ' + this.fID + ' other.jid: ' + other.jID + ' other.health: ' + other.health);   
     //if(debug) console.log(' other dmgs: ' + other.dmgs);
   }
 
-  Game.Fire = Fire;
+  Game.Fire = Fire
 })();
 
 (function(){

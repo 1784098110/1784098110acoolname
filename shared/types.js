@@ -33,16 +33,17 @@ Game.enums = {
   TClass: Object.freeze({'none': 0, 'close':1, 'shoot':2, 'mute':3}),
   WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6}),
   GOver: Object.freeze({'death': 0, 'teamWin': 1, 'teamLose': 2, 'playerWin': 3, 'playerLost':4}),
-  OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 4}),
-  TType: Object.freeze({'river': 0, 'dessert': 1, 'swamp': 2, 'beach': 4}),
+  OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 3}),
+  OPType: Object.freeze({'treeTrunk': 0, 'treeCrown': 1, 'rock': 2, 'house11': 3, 'house12': 4, 'house13': 5}),
+  TType: Object.freeze({'river': 0, 'dessert': 1, 'swamp': 2, 'beach': 3}),
   GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3}),
-  ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 4, 'entrance':5})
+  ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 3, 'entrance':4})
 
 };
 
 //Gobject
 (function(){
-  function Gobject(x, y, shape, angle, passable){
+  function Gobject(x, y, shape, angle, passable, shield, health){
     
     //todo this.id = id; //only assign on server side
 
@@ -52,6 +53,12 @@ Game.enums = {
     this.shape = shape;
     this.angle = angle || 0;
     this.passable = (passable === undefined) ? false : passable; 
+
+    //undestructible objects have health and shield undefined
+    this.health = (shield === undefined) ? undefined : health; 
+    this.maxHealth = health;//health is by default based on size and set by shapes
+    this.shield = shield;
+    this.dmgs = []; //damage received to be processed each iteration
 
     //object specific boundary if applicable.
     this.xMin;
@@ -73,10 +80,17 @@ Game.enums = {
     this.upperGround;//externally assigned
     /** 
      * obstacle part only
+     * this.objectDied;
      * this.sprite;
      * this.dx;
      * this.dy;
      * this.oID;
+     * this.baseRadius;
+     * this.radiusToHealth;
+     * this.baseWidth;
+     * this.widthToHealth;
+     * this.baseHeight;
+     * this.heightToHealth
      */
 
     /**
@@ -108,11 +122,35 @@ Game.enums = {
 
     this.vAdd(dx, dy);
   }
-  Gobject.prototype.face = function(x, y){
+  Gobject.prototype.faceDirection = function(x, y){
     //?? optimize?
     let angle = (Math.atan2(y - this.y, x - this.x)).fixed();//?? is this causing waving and rounded fire angle?
     this.angle = angle;
   }
+  Gobject.prototype.setBounds = function(xMin, yMin, xMax, yMax){
+    //set movement limit on map
+    this.xMin = 0;
+    this.xMax = this.game.map.width;
+    this.yMin = 0;
+    this.yMax = this.game.map.height;
+  }
+  //update stats like health based on dmgs received
+  Gobject.prototype.updateStats = function(){
+    if(debug) console.assert(this.name === undefined);
+    //if(debug && this.oID !== undefined) console.log('Gobject JID: ' + this.jID + ' updateStats: health before update: ' + this.health);
+
+    //process each dmg
+    for(let i = 0, l = this.dmgs.length; i < l; i++){
+      let dmgObj = this.dmgs[i];
+
+      //deduct dmg from health ?? add shield for ordinary objects?
+      let dmg = Math.round(dmgObj.dmg * (1 - this.shield));
+      this.health -= dmg;
+    }
+    this.dmgs = [];
+    //if(debug && this.oID !== undefined) console.log('Gobject jID: ' + this.jID + ' updateStats: health after update: ' + this.health);
+  }
+
   Gobject.prototype.vAdd = function (x, y){
     this.x += x;
     this.y += y;
@@ -171,7 +209,7 @@ Game.enums = {
 //Point
 (function(){
   function Point(x, y){
-    Game.Gobject.call(this, x, y, Game.enums.Shape.point, true);
+    Game.Gobject.call(this, x, y, Game.enums.Shape.point, true, undefined, undefined);
 
     //Testing. 
     //purely for graphical purposes
@@ -198,8 +236,8 @@ Game.enums = {
 
 //Line
 (function(){
-  function Line(x, y, x2, y2, length, angle, passable){//x and y are one end of line
-    Game.Gobject.call(this, x, y, Game.enums.Shape.line, angle, (passable === undefined) ? true : passable);
+  function Line(x, y, x2, y2, length, angle, passable){//x and y are one end of line. ?? do lines and points need shield param?
+    Game.Gobject.call(this, x, y, Game.enums.Shape.line, angle, (passable === undefined) ? true : passable, undefined, undefined);
     
     //x2 and y2 or length and angle can be omitted but not both
     this.length = (length === undefined) ? Math.sqrt((x2 - x) * (x2 - x) + (y2 - y) * (y2 - y)) : length;
@@ -238,8 +276,8 @@ Game.enums = {
 
 //Rectangle
 (function(){
-  function Rectangle(width, height, x, y, passable){//x and y are coor of center
-    Game.Gobject.call(this, x, y, Game.enums.Shape.rectangle, 0, passable);//angle is always 0
+  function Rectangle(width, height, x, y, passable, shield){//x and y are coor of center
+    Game.Gobject.call(this, x, y, Game.enums.Shape.rectangle, 0, passable, shield, width * 2);//angle is always 0
     this.width = width;
     this.height = height;
   }
@@ -377,8 +415,8 @@ Game.enums = {
 
 //Circle
 (function(){
-  function Circle(r, x, y, angle, passable){
-    Game.Gobject.call(this, x, y, Game.enums.Shape.circle, angle, passable);
+  function Circle(r, x, y, angle, passable, shield){
+    Game.Gobject.call(this, x, y, Game.enums.Shape.circle, angle, passable, shield, r * 2);
     this.radius = r;
   }
   Circle.prototype = Object.create(Game.Gobject.prototype);
@@ -596,8 +634,8 @@ Game.enums = {
 
 //Entity
 (function(){
-  function Entity(tID, lWeapon, rWeapon){
-    Game.Circle.call(this, 25, 0, 0, 0, false);
+  function Entity(tID, lWeapon, rWeapon, shield){
+    Game.Circle.call(this, 25, 0, 0, 0, false, shield);
 
     this.tID = tID;
     this.gList = Game.enums.GList.entity;
@@ -654,19 +692,18 @@ Game.enums = {
 //Character
 (function(){
   function Character(health, speed, vision, tID, lWeapon, rWeapon, color, name){
-    Game.Entity.call(this, tID, lWeapon, rWeapon);
+    Game.Entity.call(this, tID, lWeapon, rWeapon, 0);
     //combat stats
     this.health = health;
+    this.maxHealth = this.health;
     this.speed = speed;
     this.vision = vision;
-    this.shield = 0;
 
     this.state;//initially undefined
 
-    this.color = color;
+    this.color = color;//todo. should also allow sprite(custom skin)
     this.name = name;
 
-    this.dmgs = []; //damage received to be processed each iteration
     this.killerID; //to be assigned when killed to remember killer
 
     //todo. better way to tag zones. right now it's just clearing map each time them setting occupied zTypes to true. also should check for zones less frequently than collides
@@ -683,8 +720,11 @@ Game.enums = {
   Character.prototype = Object.create(Game.Entity.prototype);
   Character.prototype.constructor = Character;
 
-  //update personal stats like health
+  //update personal stats like health based on dmgs received ?? combine with obj update stats?
   Character.prototype.updateStats = function(){
+
+    //if(debug) console.log('Character updateStats: health before update: ' + this.health);
+
     //process each dmg
     for(let i = 0, l = this.dmgs.length; i < l; i++){
       let dmgObj = this.dmgs[i];
@@ -813,12 +853,6 @@ Game.enums = {
 
     this.state = Game.enums.PState.active;
     this.upperGround = true;//players always spawn above ground
-
-    //set pos limit on map
-    this.xMin = 0;
-    this.xMax = this.game.map.width;
-    this.yMin = 0;
-    this.yMax = this.game.map.height;
   }
 
 
@@ -859,7 +893,7 @@ Game.enums = {
     //change angle. controls mouse coor is based on canvas, add view coor 
     let xView = this.x - this.viewW/2;
     let yView = this.y - this.viewH/2;
-    this.face(controls.mouseX + xView, controls.mouseY + yView); //mouse pos is relative to world
+    this.faceDirection(controls.mouseX + xView, controls.mouseY + yView); //mouse pos is relative to world
 
     //if(debug && (~~dx || ~~dy)) console.log('player handlecontrols: controls: ~~dx: ' + (~~dx) + ' ~~dy: ' + (~~dy) + ' x: ' + this.x + ' y: ' + this.y);
 

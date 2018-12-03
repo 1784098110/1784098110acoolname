@@ -136,13 +136,15 @@
            //This is the buffer that is the driving factor for our networking
         this.server_updates = [];
 
-      } else { //if it's server
+      } else if(this.server) {
 
         this.playerAlives = 0;//count of how many are alive
         this.server_gameOverInterface;//to call server.js when game ends. ?? cleaner way to let server.js know?
+        
+        this.toUpdateStatsObjects = [];//list of jids besides players whose stats need update 
+        this.updatedObjects = [];//jids
 
         this.server_time = 0;
-        this.laststate = {};
 
         this.fidCounter = 0; //for assigning fid to fires
         this.pidCounter = 0; //for assigning pID to players
@@ -339,10 +341,9 @@
     });
 
     //create new player based on config from client
-    let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, 
-      playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
-    
+    let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
     player.playerConfig = playerConfig;
+    player.setBounds(0, 0, this.map.width, this.map.height);
 
     //testing. for quick getting to gameover.
     /*
@@ -399,8 +400,8 @@
     return false;
   }
 
-  //decide location of spawn and tell object to spawn
-  game_core.prototype.spawnObject = function(obj, xMin, yMin, xMax, yMax){
+  //decide location of spawn and tell object to spawn. right now only used on character
+  game_core.prototype.spawnObject = function(obj, xMin, yMin, xMax, yMax){//bounds are spawn bounds not movement bounds
     //random spawn location
     let x = Math.round(Math.random() * (xMax - xMin)) + xMin;
     let y = Math.round(Math.random() * (yMax - yMin)) + yMin;
@@ -450,9 +451,12 @@
 
   //add a firing object to fire object list 
   game_core.prototype.server_addFire = function(obj){
-    
+      
     if(debug) console.assert(obj); 
     obj.fID = this.createFID(); 
+
+    obj.toUpdateStatsObjects = this.toUpdateStatsObjects;//to know which obj need stats update
+    if(debug) console.assert(obj.toUpdateStatsObjects === this.toUpdateStatsObjects);
 
     this.fires.set(obj.fID, obj); 
     this.map.addObject(obj); 
@@ -580,10 +584,9 @@
     //list of obstacles to generate and how many to generate.
     //argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, oType 
     let templatesUpper = [//upper ground
-      //new Game.Obstacle(1, 80, 80, 400, 400, 400, 400, Game.enums.OType.door),
-      [0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance, true],
+      [1, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance, true],//testing. specified location for convenience
       [0, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock, true],
-      [20, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house, true],
+      [0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house, true],
       [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree, true],
       [0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance, true],
     ];
@@ -665,13 +668,15 @@
     return 0;
   }
   game_core.prototype.removeObstacle = function(obj){
-
-    //remove all parts
+    
+    //remove all parts and zones
     obj.parts.forEach(part => {
       this.map.removeObject(part);
     });
 
-    //zones can't be removed. 
+    obj.zones.forEach(zone => {
+      this.map.removeZone(zone);
+    });
 
     //remove obstacle from list
     this.obstacles.delete(obj.oID);
@@ -706,16 +711,16 @@
       if(player.state === Game.enums.PState.active) player.updateGraphics();
     });
   }
-
   game_core.prototype.server_update_stats = function(){
 
+    //go through all players
     this.players.forEach((player) => {
       if(player.state !== Game.enums.PState.active)return;
 
       player.updateStats();
       //if player just died
       if(player.health <= 0){
-        this.server_player_died(player);
+        this.server_playerDied(player);
 
         //if only one left declare victory
         if(this.playerAlives !== 1) return;
@@ -724,6 +729,40 @@
         });  
       }
     });
+
+    //update all objects besides players(right now only obstacles). only update ones that need update
+    const updatedjID = [];
+    for(let i = this.toUpdateStatsObjects.length - 1; i >= 0; i--){
+
+      if(updatedjID[this.toUpdateStatsObjects[i]]) continue;//if already updated in this round
+      else updatedjID[this.toUpdateStatsObjects[i]] = true;
+
+      const obj = this.map.objects.get(this.toUpdateStatsObjects[i]);
+      if(!obj) return;//object might not exist anymore
+      
+      obj.updateStats();//?? obj size most likely changed, but is it worth updating it on map grid?
+
+      //if it's part of obstacle update obstacle
+      if(obj.oID !== undefined){
+        const obstacle = this.obstacles.get(obj.oID);
+        if(!obstacle) continue;//obstacle might already be removed
+        if(obstacle.update(obj)){//obstacle update return true if obstacle also dies
+          this.removeObstacle(obstacle);
+          if(debug) console.log(`Obstacle ${obj.oID} died`);
+        }
+        else if(obj.health <= 0){
+          obstacle.parts.delete(obj.opType);
+          this.map.removeObject(obj);
+        }
+      }
+      else if(obj.health <= 0){//if not part of obstacle but dead
+        this.map.removeObject(obj);
+      }    
+      //add to updated object list to inform client on regular update
+      this.updatedObjects.push(obj.jID);
+      //take obj out of update notification array after processing
+      this.toUpdateStatsObjects.splice(i, 1);
+    }
   }
   game_core.prototype.server_update_zones = function() {
       
@@ -806,11 +845,10 @@
       update += ':' + player.last_input_seq;
       update += ':';
 
-      //now add the updates of players, including self despite 'oth' variable name
+      //add the updates of players, including self despite 'oth' variable name
       this.players.forEach((oth) => {
-        if(!player.sees(oth) || oth.state !== Game.enums.PState.active) return; //skip if it's self or self can't see it
+        if(!player.sees(oth) || oth.state !== Game.enums.PState.active) return; 
         
-        //else add the player's info to the update
         update += oth.x + ',' + oth.y + ',' + oth.angle + ',' + oth.pID + ',' + oth.lWeapon.spriteIndex + ',' + oth.rWeapon.spriteIndex + ',' + oth.health + ';';
       });
 
@@ -850,10 +888,19 @@
       }
       player.removedFires = [];
 
-      //if(debug) console.log('server update sent: ' + update);
+      update += ':';
 
+      //send jids of objects that changed, right now it's only health
+      for(let i = 0, l = this.updatedObjects.length; i < l; i++){
+        const jID = this.updatedObjects[i];
+        update += `${jID},${this.map.objects.get(jID).health};`;
+      }
+
+      //if(debug) console.log('server update sent: ' + update);
       player.instance.send(update);
     });
+    //refresh objects to remove list
+    this.updatedObjects = [];
   
   }; //game_core.server_update
   
@@ -892,7 +939,7 @@
   }
   
   //handle a player's death. 
-  game_core.prototype.server_player_died = function(player){
+  game_core.prototype.server_playerDied = function(player){
 
     //inform clients
     let deathUpdate = 's/d/' + player.pID + ';' + player.killerID;
@@ -914,7 +961,6 @@
 
     if(debug) console.log('Player ' + player.pID + ' died: alive count: ' + this.playerAlives);
   }
-
   /*
   
    Client side functions
@@ -1150,15 +1196,16 @@
     update.last_input_seq = parseInt(commands[1], 10);
     update.players = commands[2].split(';').slice(0, -1);
     update.fires = commands[3].split(';').slice(0, -1);
-    update.firesRemoved = commands[4].split(';').slice(0, -1);
+    update.removedFires = commands[4].split(';').slice(0, -1);
+    update.updatedObjects = commands[5].split(';').slice(0, -1);
 
     //if(debug) console.log('server update players: ' + update.players);
 
     update.players = update.players.map(this.client_parseServerPlayerUpdate.bind(this));
     update.fires = update.fires.map(this.client_parseServerFireUpdate.bind(this));
-    update.firesRemoved = update.firesRemoved.map(this.client_parseServerFireRemoveUpdate.bind(this));
+    update.removedFires = update.removedFires.map(this.client_parseServerFireRemoveUpdate.bind(this));
+    update.updatedObjects = update.updatedObjects.map(this.client_parseServerObjectUpdate.bind(this));
 
-    
     return update;
   }
 
@@ -1247,6 +1294,18 @@
 
     return parseInt(fID, 10);
   }
+  //optimize. simple methods can be eliminated
+  game_core.prototype.client_parseServerObjectUpdate = function(data){//optimize. if not getting too complex just make it inline
+    //if(debug) console.log('parseServer RemoveFire: fID: ' + fID);
+
+    let commands = data.split(',');
+    let update = {
+      jID: parseInt(commands[0], 10),
+      health: parseInt(commands[1], 10)
+    };
+
+    return update;
+  }
   //create a fire based on parsed server update object
   game_core.prototype.client_createFire = function(instance){
     let fire;
@@ -1320,18 +1379,47 @@
         }
 
         //remove fires with their fid
-        for(let i = 0, l = update.firesRemoved.length; i < l; i++){
-          let fire = this.fires.get(update.firesRemoved[i]);
+        for(let i = 0, l = update.removedFires.length; i < l; i++){
+          let fire = this.fires.get(update.removedFires[i]);
 
           //if(debug) console.log('remove fire: fID: ' + update.firesRemoved[i]);
 
           if(fire) fire.terminate = true;//check because it might already be removed by client side update
         }
+        //update objects
+        for(let i = 0, l = update.updatedObjects.length; i < l; i++){
+          const instance = update.updatedObjects[i];
+          const obj = this.map.objects.get(instance.jID); 
+          if(!obj) return;//object might not exist anymore
 
-        this.camera.update(this.map.cellSizeg, this.map.gridWg);//update camera coords right after self update. otherwise coors don't synchronize and jitter happens
+          obj.health = instance.health;
+          obj.updateStats();
+          if(debug) console.log(`server obj update: health: ${obj.health}`);
+
+          //if it's part of obstacle update obstacle
+          if(obj.oID !== undefined){
+            const obstacle = this.obstacles.get(obj.oID);
+            if(!obstacle) continue;//obstacle might already be removed
+            if(obstacle.update(obj)){//obstacle update return true if obstacle also dies
+              this.removeObstacle(obstacle);
+              if(debug) console.log(`server object update: remove obstacle: oID: ${obj.oID}`);
+            }
+            else if(obj.health <= 0) {
+              obstacle.parts.delete(obj.opType);
+              this.map.removeObject(obj);
+            }
+          }
+          else if(obj.health <= 0){//if not part of obstacle but dead
+            if(debug) console.log(`server object update: obj dead but not part of obstacle: jID: ${obj.jID}`);
+            this.map.removeObject(obj);
+          }    
+        }
 
         //update everything graphics related together here before prediction to prevent jitter. todo. move updates to physics_update(or somewhere else ?? ) once have prediction 
-          //update fires
+        
+        this.camera.update(this.map.cellSizeg, this.map.gridWg);//update camera coords right after self update. otherwise coors don't synchronize and jitter happens
+  
+        //update fires
         this.fires.forEach((fire) => {
           //map not involved on client side yet
 
@@ -1474,16 +1562,21 @@
     
     /**
      * todotodo.
-     * groundlevel change
      * destructible obstacle
+     * hiding places
+     * use fire graphic grid on server side
+     * groundlevel change
+     * 
      */
     /**
      * ??
+     * Why do fires rate(bullets) tend to synchronize over time
+     * For updatestats, more efficient to let whoever(obstacle or player etc) need stats update put their id in a array and go through that?
      * Draw game canvas on itself in response to moving and then draw the new section to optimize?
      * Should obstacles to draw also be dictated by servers? that would cost bandwidth, 
-     * but would it increase client performance since on need to iterate graphic grid?
+     *  but would it increase client performance since on need to iterate graphic grid?
      * Is it a better idea to split each cellg into lists by obj type or just iterate through all and draw right ones? 
-     * also since fires and entites to draw are dictated by servers should they just not be in graphic grid on client side?
+     *  also since fires and entites to draw are dictated by servers should they just not be in graphic grid on client side?
      * Does index affect performance? how to utilize typed arrays?
      * 
      */

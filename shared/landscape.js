@@ -32,6 +32,7 @@
     this.gridgUpper = [];//for all graphics
     this.gridgUnder = [];
 
+    this.objects = new Map();
     this.zones = new Map();//zones need to be identified. ?? do they really?
 
     //all zones and objects have ids
@@ -201,6 +202,32 @@
       }
     }
   }
+  Land.prototype.removeZone = function(obj){
+
+    const gList = obj.gList;
+    let grid, gridg;
+    [grid, gridg] = (obj.upperGround === true) ? [this.zoneGridUpper, this.gridgUpper] : [this.zoneGridUnder, this.gridgUnder];
+    const cells = obj.cells;
+    const cellsg = obj.cellsg;
+    const gridH = this.gridW;
+    const gridHg = this.gridWg;
+    let x, y;
+
+    for (let i = 0, l = cells.length; i < l; i++){
+      x = Math.floor(cells[i] / gridH);
+      y = cells[i] % gridH;
+      grid[x][y].splice(grid[x][y].indexOf(obj), 1);
+    }
+    obj.cells = [];
+
+    //also remove on graphic grid. used by both server and client
+    for (let i = 0, l = cellsg.length; i < l; i++){
+      x = Math.floor(cellsg[i] / gridHg);
+      y = cellsg[i] % gridHg;
+      gridg[x][y][gList].splice(gridg[x][y][gList].indexOf(obj), 1);
+    }
+    obj.cellsg = [];
+  }
   //general object handling
   Land.prototype.addObject = function(obj){
 
@@ -211,8 +238,11 @@
     let grid, gridg;
     [grid, gridg] = (obj.upperGround === true) ? [this.gridUpper, this.gridgUpper] : [this.gridUnder, this.gridgUnder];
 
-    //should fires not get universal id because there are so many of them ?? or does it not matter? 
-    if(obj.fID === undefined) obj.jID = this.createJID();
+    //should fires not get universal id and enter objects map because there are so many of them ?? 
+    if(obj.fID === undefined){
+      obj.jID = this.createJID();
+      this.objects.set(obj.jID, obj);
+    } 
 
     //if(debug && !obj.upperGround) console.log('map addobject: obj upperground: ' + obj.upperGround);
 
@@ -343,7 +373,7 @@
   }
   Land.prototype.handleZones = function(obj){//only characters should be passed in 
 
-    obj.zones.clear();//so as to know when obj gets out of a zone. ?? better way?
+    obj.zones.clear();//?? better way to turn off zone flags to know when obj get out of zone?
 
     let grid = (obj.upperGround === true) ? this.zoneGridUpper : this.zoneGridUnder;
 
@@ -375,7 +405,6 @@
 
     const grid = (obj.upperGround === true) ? this.gridUpper : this.gridUnder;
     const lastCheck = [];
-    const lastCheckFire = [];
 
     //check for collision with all objects in ocupied cells
     const cells = obj.cells;
@@ -389,7 +418,7 @@
 
         if(inhab.fID !== undefined) continue;//fires can not yet be the object of collide. they are subjects
         
-        //no need to check twice the same obj. since fires don't have jids check separately
+        //no need to check twice the same obj.
         if(lastCheck[inhab.jID]) continue;
         lastCheck[inhab.jID] = true;
 
@@ -642,6 +671,10 @@
     this.angle;//later assigned when put to map
     this.x;//certain pre agreed anchor coor
     this.y;
+
+    this.healthPart;//if defined the entire obstacle changes size with a part's health
+    this.baseSizeRatio = 0.4;//parts that change size need a minimum size when health is zero
+
     //get a pseudorandom position and angle
     this.scramblePosition();
 
@@ -670,6 +703,7 @@
 
     //add bounds to all parts
     this.parts.forEach(part => {
+      //oid is externally assigned
       part.xMin = this.xMin;
       part.xMax = this.xMax;
       part.yMin = this.yMin;
@@ -677,6 +711,23 @@
       part.upperGround = this.upperGround;
       part.angle = this.angle;
       part.gList = Game.enums.GList.obstacle;
+      part.obstacleDied = false;
+
+      if(this.healthPart){//meaning if obstacle's size changes with health of a certain part. these should not contain points and lines
+        const health = this.healthPart.health;
+        if(part.shape === Game.enums.Shape.rectangle){
+          //keep ratios to change obstacles size upon damage
+          part.baseWidth = Math.round(part.width * this.baseSizeRatio);
+          part.baseHeight = Math.round(part.height * this.baseSizeRatio);
+          part.widthToHealth = (part.width - part.baseWidth) / health;
+          part.heightToHealth = (part.height - part.baseHeight) / health;
+        }
+        if(part.shape === Game.enums.Shape.circle){
+          //keep ratios to change obstacles size upon damage
+          part.baseRadius = Math.round(part.radius * this.baseSizeRatio);
+          part.radiusToHealth = (part.radius - part.baseRadius) / health;
+        }
+      }
 
       //parts are made for angle === 0. adjust them to actual angle
       //first flip height and width if necessary
@@ -701,7 +752,7 @@
       part.y = this.y + dy;
     });
 
-    //process zones are simpler. 
+    //process zones are simpler. obstacles that change size do not affect zones 
     this.zones.forEach(zone => {
       //zones set their own angle for now and don't have bounds since they don't collide
       zone.upperGround = this.upperGround;
@@ -741,6 +792,38 @@
       part.draw(context, xView, yView, scale);
     });
   }
+  //called when a part of obstacle changes stats return true if obstacle is dead
+  Obstacle.prototype.update = function(part){
+
+    //if part is not dead obstacle is not dead
+    if(part.health > 0){
+      //if part is health part obstacle changes size
+      if(part === this.healthPart){
+        const health = part.health;
+        
+        this.parts.forEach(obj => {
+          if(obj.shape === Game.enums.Shape.circle){
+            obj.radius = Math.round(health * obj.radiusToHealth) + obj.baseRadius;
+            //if(debug) console.log(`obstacle update part: radius: ${obj.radius} optype: ${obj.opType} baseradius: ${obj.baseRadius} radiustohealth: ${obj.radiusToHealth}`);
+          }
+          if(obj.shape === Game.enums.Shape.rectangle){
+            obj.width = Math.round(health * obj.widthToHealth) + obj.baseWidth;
+            obj.height = Math.round(health * obj.heightToHealth) + obj.baseHeight;
+          }
+        });
+      }
+      return false;
+    }
+    //else see if part's death affect obstacle based on optype
+    if(debug) console.assert(part.opType !== undefined);
+    switch(part.opType){
+      case(Game.enums.OPType.house12):
+      return false;
+
+      default: 
+      return true;
+    }
+  }
 
   Obstacle.prototype.tree = function(){
 
@@ -748,24 +831,34 @@
     let radius = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
     
     //assemble a tree
-    let trunk = new Game.Circle(radius, this.x, this.y, this.angle, false);
+    let trunk = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.1);
     trunk.color = 'brown';
-    let crown = new Game.Circle(radius * 4, this.x, this.y, this.angle, true);
+    trunk.opType = Game.enums.OPType.treeTrunk;
+
+    let crown = new Game.Circle(radius * 4, this.x, this.y, this.angle, true, undefined);
     crown.color = 'rgba(102, 204, 0, 0.5)';
+    crown.opType = Game.enums.OPType.treeCrown;
 
     //todo. colors should be sprites. but individual sprites or aggregate sprite? what about house with its furnitures? those need individual sprites
 
-    this.parts.set('trunk', trunk);
-    this.parts.set('crown', crown);
+    this.parts.set(trunk.opType, trunk);
+    this.parts.set(crown.opType, crown);
+
+    this.healthPart = trunk;
   }
   Obstacle.prototype.rock = function(){
 
     let radius = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
 
-    let rock = new Game.Circle(radius, this.x, this.y, this.angle, false);
+    let rock = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.3);
     rock.color = 'pink';
+    rock.opType = Game.enums.OPType.rock;
 
-    this.parts.set('rock', rock);
+    this.parts.set(rock.opType, rock);
+
+    this.healthPart = rock;
+
+    if(debug) console.log(`rock construct: radius: ${radius} health: ${health}`);
   }
   Obstacle.prototype.house = function(){
 
@@ -777,26 +870,29 @@
     let dx;
     let dy;
 
-    let part1 = new Game.Rectangle(width, height, this.x, this.y, false);
+    let part1 = new Game.Rectangle(width, height, this.x, this.y, false, 0.3);
     part1.color = 'green';
+    part1.opType = Game.enums.OPType.house11;
 
     dx = wh;
     dy = hh;
-    let part2 = new Game.Rectangle(wh, hh, this.x + dx, this.y + dy, false);
+    let part2 = new Game.Rectangle(wh, hh, this.x + dx, this.y + dy, false, 0.2);
     part2.color = 'orange';
     part2.dx = dx;
     part2.dy = dy;
+    part2.opType = Game.enums.OPType.house12;
 
     dx = -wh;
     dy = hh;
-    let part3 = new Game.Rectangle(wh - 10, hh - 10, this.x + dx, this.y + dy, true);
+    let part3 = new Game.Rectangle(wh - 10, hh - 10, this.x + dx, this.y + dy, true, undefined);
     part3.color = 'brown';
     part3.dx = dx;
     part3.dy = dy;
+    part3.opType = Game.enums.OPType.house13;
 
-    this.parts.set('part1', part1);
-    this.parts.set('part2', part2);
-    this.parts.set('part3', part3);
+    this.parts.set(part1.opType, part1);
+    this.parts.set(part2.opType, part2);
+    this.parts.set(part3.opType, part3);
     
   }
   Obstacle.prototype.entrance = function(){
@@ -804,11 +900,10 @@
     let width = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
     let height = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
     
-    let zone = new Game.Rectangle(width, height, this.x, this.y, true);
+    let zone = new Game.Rectangle(width, height, this.x, this.y, true, undefined);
     zone.angle = this.angle + PI / 3;
     zone.color = 'yellow';
     zone.zType = Game.enums.ZType.entrance;
-    zone.zID = 
 
     this.zones.push(zone);
   }
@@ -879,7 +974,7 @@
     let y = Math.round(this.generator.random() * (yMax - yMin)) + yMin;
     let angle = this.generator.random() * (PI);
 
-    let tile = new Game.Rectangle(w, h, x, y, true);//river tile centered on crossing point
+    let tile = new Game.Rectangle(w, h, x, y, true, undefined);//river tile centered on crossing point
     tile.angle = angle;
     this.zones.push(tile);
 
@@ -951,7 +1046,7 @@
     const y1 = (ya + Math.sin(reverseAngle) * l);
     const x1 = (xa + Math.cos(reverseAngle) * l);
 
-    const tile = new Game.Rectangle(w, h, x1, y1, true);
+    const tile = new Game.Rectangle(w, h, x1, y1, true, undefined);
     tile.angle = angle1;
     this.zones.push(tile);
 
@@ -991,7 +1086,7 @@
     const x2 = (xf2 + Math.cos(reverseAngle2) * l);
 
     //add tiles
-    const tile1 = new Game.Rectangle(w, h, x1, y1, true);
+    const tile1 = new Game.Rectangle(w, h, x1, y1, true, undefined);
     tile1.angle = angle1;
     this.zones.push(tile1);
     this.addRiverTile(w, h, x1, y1, angle1);
@@ -1003,7 +1098,7 @@
       //todo. intersection buffer
     } 
 
-    const tile2 = new Game.Rectangle(w, h, x2, y2, true);
+    const tile2 = new Game.Rectangle(w, h, x2, y2, true, undefined);
     tile2.angle = angle2;
     this.zones.push(tile2);
     this.addRiverTile(w, h, x2, y2, angle2);
