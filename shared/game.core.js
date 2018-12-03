@@ -110,7 +110,7 @@
         this.ctx = this.canvas.getContext('2d');
 
         //camera will be set to follow self upon init
-        this.camera = new Game.Camera(undefined, this.canvas.width, this.canvas.height);
+        this.camera = new Game.Camera(this.canvas.width, this.canvas.height);
 
         //to be fetched periodically by input handler and sent to server
         this.controls = {
@@ -344,6 +344,8 @@
     let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
     player.playerConfig = playerConfig;
     player.setBounds(0, 0, this.map.width, this.map.height);
+    //have camera on server side for determining what player can see
+    player.camera = new Game.Camera(playerConfig.viewW, playerConfig.viewH);
 
     //testing. for quick getting to gameover.
     /*
@@ -360,6 +362,7 @@
     if(debug) console.assert(player.pID !== undefined);
     this.players.set(player.pID, player);
     this.map.addObject(player); 
+    player.camera.follow(player);//follow after player got a coor
     
     return spawnPos;
   }
@@ -479,6 +482,49 @@
 
     this.map.removeObject(fire);
     this.fires.delete(fire.fID); 
+  }
+  //update player's visible fires and players and return newly visible fires and visible players
+  game_core.prototype.server_updateVisibles = function(player){
+    
+    const update = {players: [], newFires: []};
+
+    const grid = player.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
+    const subGridX = player.camera.subGridX;
+    const subGridY = player.camera.subGridY;
+    const subGridXMax = player.camera.subGridXMax;
+    const subGridYMax = player.camera.subGridYMax;
+    const drawn = [];//only drawn players
+
+    //if(debug) console.log(`update visibles: subGridX: ${subGridX} subGridY: ${subGridY} subGridXMax: ${subGridXMax} subGridYMax: ${subGridYMax} `);
+
+    //iterating occupied graphic grid to get relevant obstacles to draw
+    for(let i = subGridX; i < subGridXMax; i++){
+      for(let j = subGridY; j < subGridYMax; j++){
+        //if(debug && grid[i][j][gList].length > 0) console.log(`draw obstacles gridg[i][j] length: ${grid[i][j][gList].length} i: ${i} j: ${j} subgirdX: ${subGridX} subgridy: ${subGridY} subgirdXmax: ${subGridXMax} subgridymax: ${subGridYMax} `);
+
+        if(debug && (!grid[i] || !grid[i][j])) console.log(`update visibles broke: grid: i: ${i} j: ${j}`);
+        grid[i][j][Game.enums.GList.entity].forEach(obj => {
+          //todo. ?? right now there are only players. but how should AIs be classified?
+          if(debug) console.assert(obj.pID !== undefined);
+          if(drawn[obj.pID]) return;//if already in update
+          
+          update.players.push(obj);
+          drawn[obj.pID] = true;
+        });
+        grid[i][j][Game.enums.GList.fire].forEach(obj => {
+          if(debug) console.assert(obj.fID !== undefined);
+          if(player.visibleFires.has(obj.fID)) return;//if already updated
+
+          update.newFires.push(obj);
+          player.visibleFires.set(obj.fID, obj);
+          obj.viewers.push(player);
+        });
+      }
+    }
+
+    if(debug) console.assert(update.players.length > 0);//at least self has to be in it
+
+    return update;
   }
 
     //Main update loop
@@ -826,10 +872,11 @@
   game_core.prototype.server_update = function(){
     //?? after a while of continuous firing two weapons equilibrate to the same beat, cuz of round off?
 
+    //?? optimize. all these functions loop over all players. anyway to combine into one loop?
     this.server_update_graphics();//has to be in rhythm with update broadcast
     this.server_update_stats();//todo. optimize. stats update and broadcast can be on slower loop
     this.server_update_zones();//no need to be on physics fast loop. ?? should it be?
-    
+
       //Update the state of our local clock to match the timer
       //necessary ??
     this.server_time = this.local_time;
@@ -837,8 +884,12 @@
       //todo. needs to be curated to each client's view
       //optimize. string for now, should be binary. 
       //format: s/u/t;lastinputseq;x,y,angle(self);x,y,angle(other) etc.
-      //Make a snapshot of the current state, for updating the clients
     this.players.forEach((player) => {
+
+      //update viewport to know what player can see
+      if(debug) console.assert(player.camera.followed);
+      player.camera.update(this.map.cellSizeg, this.map.gridWg);
+      const visibles = this.server_updateVisibles(player);
 
       let update = "s/u/";
       update += this.server_time.fixed();
@@ -846,51 +897,43 @@
       update += ':';
 
       //add the updates of players, including self despite 'oth' variable name
-      this.players.forEach((oth) => {
-        if(!player.sees(oth) || oth.state !== Game.enums.PState.active) return; 
+      visibles.players.forEach((oth) => {
+        if(debug) console.assert(oth.state === Game.enums.PState.active);
         
         update += oth.x + ',' + oth.y + ',' + oth.angle + ',' + oth.pID + ',' + oth.lWeapon.spriteIndex + ',' + oth.rWeapon.spriteIndex + ',' + oth.health + ';';
       });
 
       update += ':';
       
-      //todo. can't iterate over all fires. need to use visual grid
       //add newly visible fires' construction params.
-      this.fires.forEach((fire) => {
-        //check if player can see fire and if fire is already updated to client. fire only gets updated on creation and destruction
-        if(player.sees(fire) && !player.visibleFires.has(fire.fID)){
-          //optimize. right now sending a brand new fire constructor parameter set. client should only need a few for graphics
-          switch(fire.wType){//diferent fire types need different params. update needs wtype in fron so client can identify
-            case(Game.enums.WType.dagger):
-              update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.life  + ',' + fire.left + ',' + fire.holdRadius + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.passable + ';';
-              break;
-            case(Game.enums.WType.katana):
-              update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.life  + ',' + fire.left + ',' + fire.holdRadius + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.passable + ';'; 
-              break;
-            case(Game.enums.WType.fist):
-              update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.speed  + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.traveled + ';';
-              break;
-            default:
-              console.log('::ERROR:: server update: fire update: no matching WType');
-          }
-          
-          player.visibleFires.set(fire.fID, fire);
-          fire.viewers.push(player);
+      visibles.newFires.forEach((fire) => {
+        //optimize. right now sending a brand new fire constructor parameter set. client should only need a few for graphics
+        switch(fire.wType){//diferent fire types need different params. update needs wtype in fron so client can identify
+          case(Game.enums.WType.dagger):
+            update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.life  + ',' + fire.left + ',' + fire.holdRadius + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.passable + ';';
+            break;
+          case(Game.enums.WType.katana):
+            update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.life  + ',' + fire.left + ',' + fire.holdRadius + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.passable + ';'; 
+            break;
+          case(Game.enums.WType.fist):
+            update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.speed  + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.traveled + ';';
+            break;
+          default:
+            console.log('::ERROR:: server update: fire update: no matching WType');
         }
       });
 
       update += ':';
 
-      //send out fids of fires to remove
+      //send out fids of fires to remove ?? a bit messy, anyway to combine with visibles update?
       for(let j = 0, l = player.removedFires.length; j < l; j++){
-      
         update += player.removedFires[j] + ';'; //add fid of fire to be removed 
       }
       player.removedFires = [];
 
       update += ':';
 
-      //send jids of objects that changed, right now it's only health
+      //send jids of all objects that changed, right now it's only health
       for(let i = 0, l = this.updatedObjects.length; i < l; i++){
         const jID = this.updatedObjects[i];
         update += `${jID},${this.map.objects.get(jID).health};`;
@@ -1394,7 +1437,7 @@
 
           obj.health = instance.health;
           //obj.updateStats(); right now update stats only update health so no need to call on client
-          if(debug) console.log(`server obj update: health: ${obj.health}`);
+          //if(debug) console.log(`server obj update: health: ${obj.health}`);
 
           //if it's part of obstacle update obstacle
           if(obj.oID !== undefined){
@@ -1402,7 +1445,7 @@
             if(!obstacle) continue;//obstacle might already be removed
             if(obstacle.update(obj)){//obstacle update return true if obstacle also dies
               this.removeObstacle(obstacle);
-              if(debug) console.log(`server object update: remove obstacle: oID: ${obj.oID}`);
+              //if(debug) console.log(`server object update: remove obstacle: oID: ${obj.oID}`);
             }
             else if(obj.health <= 0) {
               obstacle.parts.delete(obj.opType);
@@ -1410,7 +1453,7 @@
             }
           }
           else if(obj.health <= 0){//if not part of obstacle but dead
-            if(debug) console.log(`server object update: obj dead but not part of obstacle: jID: ${obj.jID}`);
+            //if(debug) console.log(`server object update: obj dead but not part of obstacle: jID: ${obj.jID}`);
             this.map.removeObject(obj);
           }    
         }
@@ -1498,8 +1541,8 @@
     const ctx = this.ctx;
     const xView = this.camera.xView;
     const yView = this.camera.yView;
-    const width = this.camera.viewWidth;
-    const height = this.camera.viewHeight;
+    const width = this.camera.width;
+    const height = this.camera.height;
     const scale = this.camera.scale;
     const subGridX = this.camera.subGridX;
     const subGridY = this.camera.subGridY;
@@ -1562,9 +1605,7 @@
     
     /**
      * todotodo.
-     * destructible obstacle
      * hiding places
-     * use fire graphic grid on server side
      * groundlevel change
      * 
      */
@@ -1586,12 +1627,11 @@
     const grid = this.self.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
     const drawn = [];
 
-    //iterating occupied logic grid to get relevant obstacles to draw
+    //iterating occupied graphic grid to get relevant obstacles to draw
     for(let i = subGridX; i < subGridXMax; i++){
       for(let j = subGridY; j < subGridYMax; j++){
         //if(debug && grid[i][j][gList].length > 0) console.log(`draw obstacles gridg[i][j] length: ${grid[i][j][gList].length} i: ${i} j: ${j} subgirdX: ${subGridX} subgridy: ${subGridY} subgirdXmax: ${subGridXMax} subgridymax: ${subGridYMax} `);
 
-        //draw upper and under in the same loop
         if(debug && (!grid[i] || !grid[i][j])) console.log(`drawObstacles: grid: i: ${i} j: ${j}`);
         grid[i][j][gList].forEach(obj => {
           if(debug) console.assert(obj.oID !== undefined);

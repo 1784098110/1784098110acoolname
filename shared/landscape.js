@@ -673,7 +673,7 @@
     this.y;
 
     this.healthPart;//if defined the entire obstacle changes size with a part's health
-    this.baseSizeRatio = 0.4;//parts that change size need a minimum size when health is zero
+    this.baseSizeRatio = 0.5;//parts that change size need a minimum size when health is zero
 
     //get a pseudorandom position and angle
     this.scramblePosition();

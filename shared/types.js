@@ -809,6 +809,7 @@ Game.enums = {
 
     //keep reference of the game player's in
     this.game = game;
+    this.camera;//externally assigned. server only. to know what player sees
 
     //only used on server side; for determining what a client can see
     this.visibleFires = new Map();//server use only
@@ -948,9 +949,9 @@ Game.enums = {
 //Camera
 (function () {
   //optimize. x and y view can be calculated with player and canvas stats
-	function Camera(followed, canvasWidth, canvasHeight) {
+	function Camera(canvasWidth, canvasHeight) {
     
-    this.followed = followed;
+    this.followed;//assigned with follow method
 
 		// viewpo rt dimensions
 		this.width = canvasWidth;
@@ -964,9 +965,9 @@ Game.enums = {
 		this.xView;
     this.yView;
   
-    //client's actual window size. can change 
-    this.viewWidth;
-    this.viewHeight;
+    //client's actual window size. can change  ?? need separate from width and height?
+    //this.viewWidth;
+    //this.viewHeight;
     this.scale;//scale of graphics to actual size
 
     //bounds of viewport on graphic grid 
@@ -986,11 +987,11 @@ Game.enums = {
   }
   //todo. all graphics should not be based on viewport size directly. should scale.
   Camera.prototype.setViewport = function(width, height) {
-    this.viewWidth = width;
-    this.viewHeight = height;
+    this.width = width;
+    this.height = height;
     this.scale = 1;//todo. when clien viewport size changes
   }
-	Camera.prototype.update = function (cellSize, gridW) {//data related to graphic grid is passed in
+	Camera.prototype.update = function (cellSize, gridW) {//graphic grid cellsize and width
 		// keep following the player (or other desired object)
 		if (this.followed) {
       if (this.followed.x - this.xView + this.xDeadZone > this.width)
@@ -1007,8 +1008,11 @@ Game.enums = {
     //update the grid coors of the bounds of the buffer graphics to be drawn
     const xView = this.xView;
     const yView = this.yView;
-    const wView = this.viewWidth;
-    const hView = this.viewHeight;
+    const wView = this.width;
+    const hView = this.height;
+
+    if(debug && !(xView && yView && wView && hView)) console.log(`camera update: xView: ${xView} yView: ${yView} wView: ${wView} hView: ${hView} `)
+
     const xViewEnd = xView + wView;
     const yViewEnd = yView + hView;
     //have some graphics buffer
