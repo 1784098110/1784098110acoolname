@@ -72,7 +72,8 @@
       cellSize: this.cellSize, 
       mapSeed: this.mapSeed,
       url: 'ws://' + this.ip + ':' + this.port,
-      players:[], //list of playerconfigs
+      players: [], //list of playerconfigs
+      objects: [],  //obstacles that changed from initial configuration based on seed
       spawn: undefined,
       pID: undefined,
       tID: undefined,
@@ -83,6 +84,8 @@
     this.gamecore.players.forEach((player) => {
       instance.players.push(player.playerConfig);
     });
+
+    instance.objects = this.gamecore.server_getChangedObstacles();
 
     //for client side syncing
     instance.server_time = this.gamecore.local_time;

@@ -121,6 +121,8 @@
     obj.zID = this.createZID();//?? but zones are split into two different lists. 
     this.zones.set(obj.zID, obj);
 
+    //if(debug && obj.zType === Game.enums.ZType.hiding) console.log(`addzone: zone: zType: ${obj.zType} zID: ${obj.zID} color: ${obj.color}`);
+
     let x = (obj.x);
     let y = (obj.y);
     let x1, y1, x2, y2;
@@ -696,6 +698,10 @@
       this.entrance();
       break;
 
+      case(Game.enums.OType.bush):
+      this.bush();
+      break;
+
       default:
       if(debug) console.log(' :: ERROR: obstacle construct no mathcing OType');
     
@@ -906,6 +912,24 @@
     zone.zType = Game.enums.ZType.entrance;
 
     this.zones.push(zone);
+  }
+  Obstacle.prototype.bush = function(){
+    const radius = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
+  
+    const zone = new Game.Circle(radius, this.x, this.y, this.angle, true, undefined);
+    zone.color = 'rgba(255,0,0, 0)';//hiding zone is invisible
+    zone.zType = Game.enums.ZType.hiding;
+
+    this.zones.push(zone);
+    
+    //hiding places are indestructible
+    const bush = new Game.Circle(radius, this.x, this.y, this.angle, true, undefined);
+    bush.color = 'rgba(0,102,0, 0.9)';
+    bush.opType = Game.enums.OPType.bush;
+
+    this.parts.set(bush.opType, bush);
+    this.healthPart = bush;    
+  
   }
 
 

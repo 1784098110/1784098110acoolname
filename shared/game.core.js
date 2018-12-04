@@ -143,6 +143,7 @@
         
         this.toUpdateStatsObjects = [];//list of jids besides players whose stats need update 
         this.updatedObjects = [];//jids
+        this.changedObstacles = new Set();//jids of obstacle parts that changed for informing newly joined clients
 
         this.server_time = 0;
 
@@ -237,11 +238,43 @@
 
     //init map
     this.map = new Game.Land(this.instance.width, this.instance.height, this.instance.cellSize);
-    //const start0 = Date.now();
+    
     this.generateMap(this.instance.mapSeed);
     //if(debug) console.log(`map generate time: ${Date.now() - start0}`);
     this.camera.setViewport(viewWidth, viewHeight);//?? client or gamecore fetch window size? messy?
     this.upperMap = this.map.render(this.obstacles); //generate background graphics
+    
+    //if(debug) console.log(`initGame changedObjs length: ${serverResponse.objects.length}`)
+    //if(debug) console.log(serverResponse.objects);
+    //update the changed obstacles
+    serverResponse.objects.forEach(changedObj => {
+      const obj = this.map.objects.get(changedObj.jID);
+
+      //if(debug) console.log(`initGame changedObj: jID: ${changedObj.jID} health: ${changedObj.health}`);
+      //if(debug) console.log(`initGame obj: jID: ${obj.jID} oID: ${obj.oID}`);
+      if(debug) console.assert(obj && obj.oID !== undefined && obj.health !== undefined)
+
+      obj.health = changedObj.health;
+      //obj.updateStats(); right now update stats only update health so no need to call on client
+      //if it's part of obstacle update obstacle
+      if(obj.oID !== undefined){
+        const obstacle = this.obstacles.get(obj.oID);
+        if(!obstacle) return;//obstacle might already be removed
+        if(obstacle.update(obj)){//obstacle update return true if obstacle also dies
+          this.removeObstacle(obstacle);
+          if(debug) console.log(`Obstacle ${obj.oID} died`);
+        }
+        else if(obj.health <= 0){
+          obstacle.parts.delete(obj.opType);
+          this.map.removeObject(obj);
+        }
+      }
+      else if(obj.health <= 0){//if not part of obstacle but dead
+        this.map.removeObject(obj);
+      }
+      
+    });
+    
     //init other players
     for(let i = 0, l = serverResponse.players.length; i < l; i++){
 
@@ -507,6 +540,11 @@
           //todo. ?? right now there are only players. but how should AIs be classified?
           if(debug) console.assert(obj.pID !== undefined);
           if(drawn[obj.pID]) return;//if already in update
+          //if obj is not hiding in the same place as this, return
+          if(obj.zones.has(Game.enums.ZType.hiding) && obj.zones.get(Game.enums.ZType.hiding) !== player.zones.get(Game.enums.ZType.hiding)){
+            //if(debug) console.log(`updatevisibles: can't see due to hiding: pID: ${obj.pID} zID: ${obj.zones.get(Game.enums.ZType.hiding)}`);
+            return;
+          } 
           
           update.players.push(obj);
           drawn[obj.pID] = true;
@@ -634,6 +672,7 @@
       [0, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock, true],
       [0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house, true],
       [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree, true],
+      [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush, true],
       [0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance, true],
     ];
     let templatesUnder = [//under ground
@@ -709,6 +748,7 @@
     //doesn't differentiate between ground levels
     this.obstacles.set(oID, obj);
 
+    //if(debug && obj.oType === Game.enums.OType.bush) console.log(`addobstacle: oType: ${obj.oType} zones length: ${obj.zones.length}`);
     //if(debug) console.log(`addobstacle: oid: ${obj.oID} cellsg length: ${cellsgCount} x: ${obj.x} y: ${obj.y}`);
     
     return 0;
@@ -738,6 +778,15 @@
   
   */
 
+  game_core.prototype.server_getChangedObstacles = function(){
+    const update = [];
+    this.changedObstacles.forEach(obj => {
+      if(debug) console.assert(obj.jID !== undefined && obj.health !== undefined);
+      update.push({jID: obj.jID, health: obj.health});
+    });
+
+    return update;
+  }
   //butt wipings
   game_core.prototype.server_endGame = function(){
 
@@ -757,13 +806,16 @@
       if(player.state === Game.enums.PState.active) player.updateGraphics();
     });
   }
+  //update characters and objects health zones etc.
   game_core.prototype.server_update_stats = function(){
 
     //go through all players
     this.players.forEach((player) => {
       if(player.state !== Game.enums.PState.active)return;
-
+      
+      this.map.handleZones(player);
       player.updateStats();
+
       //if player just died
       if(player.health <= 0){
         this.server_playerDied(player);
@@ -785,9 +837,11 @@
 
       const obj = this.map.objects.get(this.toUpdateStatsObjects[i]);
       if(!obj) return;//object might not exist anymore
-      
-      obj.updateStats();//?? obj size most likely changed, but is it worth updating it on map grid?
 
+      //if it's an obstacles remember that it changed to inform newly joined clients
+      if(obj.oID !== undefined) this.changedObstacles.add(obj);
+
+      obj.updateStats();
       //if it's part of obstacle update obstacle
       if(obj.oID !== undefined){
         const obstacle = this.obstacles.get(obj.oID);
@@ -803,24 +857,13 @@
       }
       else if(obj.health <= 0){//if not part of obstacle but dead
         this.map.removeObject(obj);
-      }    
+      }   
+
       //add to updated object list to inform client on regular update
       this.updatedObjects.push(obj.jID);
       //take obj out of update notification array after processing
       this.toUpdateStatsObjects.splice(i, 1);
     }
-  }
-  game_core.prototype.server_update_zones = function() {
-      
-    this.players.forEach((player) => {
-
-        //?? is checking for alive or not each time too inefficient?
-        if(player.state === Game.enums.PState.active){
-          this.map.handleZones(player);
-        }
-      
-      });
-  
   }
     //Updated at 15ms , simulates the world state, on sync with client
   game_core.prototype.server_update_physics = function() {
@@ -874,8 +917,7 @@
 
     //?? optimize. all these functions loop over all players. anyway to combine into one loop?
     this.server_update_graphics();//has to be in rhythm with update broadcast
-    this.server_update_stats();//todo. optimize. stats update and broadcast can be on slower loop
-    this.server_update_zones();//no need to be on physics fast loop. ?? should it be?
+    this.server_update_stats();//optimize. stats, zones update and broadcast can be on slower loop
 
       //Update the state of our local clock to match the timer
       //necessary ??
@@ -1597,20 +1639,24 @@
       //Work out the fps average debug
     this.client_refresh_fps();
   
-  }; //game_core.update_client
-
+  }//game_core.update_client
   //?? iterating through same gridsg two times to draw zones and obstacles separately. anyway to optimize?
   //only draw ones in graphic grids occupied by the viewport
   game_core.prototype.drawObstacles = function(context, xView, yView, scale, subGridX, subGridY, subGridXMax, subGridYMax){
     
     /**
      * todotodo.
-     * hiding places
+     * figure out zones graphic on clients(go under a roof, into a bush, etc. it's all about transparency)
+     *  use a GEffect enums to indicate graphic effect and have server send it out for each player?
      * groundlevel change
      * 
      */
     /**
      * ??
+     * Should clients process zones to determine graphics or all on server?
+     * Cleaner way to mark this for visibility identification? 
+     *  if two hidings overlap(artificial smoke etc) then how does this work? 
+     *  each ztype only get one zID slot;
      * Why do fires rate(bullets) tend to synchronize over time
      * For updatestats, more efficient to let whoever(obstacle or player etc) need stats update put their id in a array and go through that?
      * Draw game canvas on itself in response to moving and then draw the new section to optimize?

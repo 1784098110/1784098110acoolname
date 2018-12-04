@@ -33,11 +33,11 @@ Game.enums = {
   TClass: Object.freeze({'none': 0, 'close':1, 'shoot':2, 'mute':3}),
   WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6}),
   GOver: Object.freeze({'death': 0, 'teamWin': 1, 'teamLose': 2, 'playerWin': 3, 'playerLost':4}),
-  OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 3}),
-  OPType: Object.freeze({'treeTrunk': 0, 'treeCrown': 1, 'rock': 2, 'house11': 3, 'house12': 4, 'house13': 5}),
+  OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 3, 'bush': 4}),
+  OPType: Object.freeze({'treeTrunk': 0, 'treeCrown': 1, 'rock': 2, 'house11': 3, 'house12': 4, 'house13': 5, 'bush': 6}),
   TType: Object.freeze({'river': 0, 'dessert': 1, 'swamp': 2, 'beach': 3}),
   GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3}),
-  ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 3, 'entrance':4})
+  ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 3, 'entrance': 4, 'hiding': 5})
 
 };
 
@@ -706,8 +706,8 @@ Game.enums = {
 
     this.killerID; //to be assigned when killed to remember killer
 
-    //todo. better way to tag zones. right now it's just clearing map each time them setting occupied zTypes to true. also should check for zones less frequently than collides
-    this.zones = new Map();
+    //?? better way to tag zones. right now it's just clearing map each time them setting occupied zTypes to true. 
+    this.zones = new Map();//zID for each type of occupied zone.
 
     this.initCombatStats();
 
@@ -740,6 +740,7 @@ Game.enums = {
       }
     }
     this.dmgs = [];  
+    
   }
 
   //change combat stats based on player config
@@ -778,11 +779,18 @@ Game.enums = {
   //todo. find a better way to tag characters with their zone effects
   Character.prototype.handleZone = function(obj){
     //if(debug && obj.zType === Game.enums.ZType.entrance) console.log(`in entrance zone ${Date.now()}`);
-    if(debug) console.assert(obj.zType !== undefined);
+    if(debug) console.assert(obj.zType !== undefined && obj.zID !== undefined);
+    //if(debug && obj.zType === Game.enums.ZType.hiding) console.log(`handlezone: hiding zone: zID: ${obj.zID}`);
 
-    let zType = obj.zType;
+    let setZone = true;
+    //some ztypes have special cases
+    switch(obj.zType){
+      case(Game.enums.ZType.hiding)://hiding places have to be larger than self
+      if(obj.radius < this.radius || obj.width < this.radius * 2 || obj.height < this.radius * 2) setZone = false;
+      break;
 
-    this.zones.set(zType, true);
+    }
+    if(setZone) this.zones.set(obj.zType, obj.zID);
   }
   
 
@@ -860,8 +868,7 @@ Game.enums = {
   //right now only called on server side. client side would be different. todo
   Player.prototype.handleControls = function(controls, step){
     //step is time lapsed since last processed input in seconds
-    let speed = this.speed; //multiply time difference here for OPTIMIZE
-    let speedDiag = Math.round(Math.sqrt(speed * speed / 2));
+    const speedDiag = Math.round(Math.sqrt(this.speed * this.speed / 2));
     let dx = 0;
     let dy = 0;
 
@@ -1011,7 +1018,7 @@ Game.enums = {
     const wView = this.width;
     const hView = this.height;
 
-    if(debug && !(xView && yView && wView && hView)) console.log(`camera update: xView: ${xView} yView: ${yView} wView: ${wView} hView: ${hView} `)
+    //if(debug && !(xView && yView && wView && hView)) console.log(`camera update: xView: ${xView} yView: ${yView} wView: ${wView} hView: ${hView} `)
 
     const xViewEnd = xView + wView;
     const yViewEnd = yView + hView;
