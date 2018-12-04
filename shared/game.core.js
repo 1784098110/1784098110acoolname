@@ -46,7 +46,7 @@
   
   /* The game_core class */
     //game instance needs world width, height, cellsize
-    var game_core = function(isServer, gameInstance){
+    var game_core = function(isServer, gameInstance, gameOverInterface){
 
       if(debug) console.log(' {{ :: New Gamecore :: }}');
       
@@ -90,10 +90,11 @@
       if(!this.server) {
 
         //client only. keep a reference in order to execute killGame
-        this.client_gameOverInterface; //?? better way to execute killGame through gamecore?
+        //?? better way to execute killGame through gamecore?
+        this.client_gameOverInterface = gameOverInterface; 
 
         //necessary for players on clientside because client has all players' stats but only some's actions
-        this.currPlayersID = [];
+        this.currentPlayers = [];
         this.clientConfig; //store temporarily to be sent when ws is connected
 
         this.self; //special pointer for self. But self is also in regular players array
@@ -102,6 +103,7 @@
         this.canvas = document.getElementById('gameCanvas');
         this.showMap = false;//show player map toggle ?? where should this toggle be for best practice?
         this.upperMap;//to be created by map
+        this.gtoggledObstacles = new Set();//list of obstacles that toggle graphics due to players zones occupation
 
           //Adjust their size
         //if(debug) console.log('client gamecore init: canvas width: ' + game.camera.width + ' height: ' + game.camera.height);
@@ -277,13 +279,8 @@
     
     //init other players
     for(let i = 0, l = serverResponse.players.length; i < l; i++){
-
-      let playerConfig = serverResponse.players[i];
-      let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, 
-        playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
-      //since we don't spawn other players, manually set them to active, ?? or do others' states not matter?
-      player.state = Game.enums.PState.active;
-      this.players.set(player.pID, player);//todo. for 'self in players array' strategy we can put player in array with pId as their index for easy access
+      if(debug && serverResponse.players[i].pID === undefined){ console.log(`init: other player pId undefined: playerconfig: `); console.log(serverResponse.players[i]);}
+      this.client_addPlayer(serverResponse.players[i]);
     }
   }
 
@@ -352,13 +349,16 @@
 
   game_core.prototype.client_addPlayer = function(playerConfig){
     //create new player based on config from client
-    let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, 
-      playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
+    const player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
+    player.state = Game.enums.PState.active;
+    //if(debug && player.pID === undefined) {console.log(`add undefined pID: playerconfig: `); console.log(playerConfig);}
 
-    if(this.self === undefined) {
+    //self is also in regular players list, but before spawn message self has no pid
+    if(this.self === undefined && player.pID === undefined) {
       this.self = player;
+      //if(debug) console.log(`addplayer: add self: pID: ${player.pID}`);
     }else{
-      this.players.set(player.pID, player);//self is also in regular players list, but right now self has no pid
+      this.players.set(player.pID, player);
       if(debug) console.log(' :: Player Join: pID: ' + player.pID);
     }
   }
@@ -399,7 +399,7 @@
     
     return spawnPos;
   }
-
+  //when ws is connected after the initialization exchange
   game_core.prototype.server_playerConnect = function(ws, clientConfig){
 
     let playerConfig = this.buildPlayerConfig(clientConfig);
@@ -560,8 +560,6 @@
       }
     }
 
-    if(debug) console.assert(update.players.length > 0);//at least self has to be in it
-
     return update;
   }
 
@@ -665,15 +663,15 @@
 
     this.map.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
 
-    //list of obstacles to generate and how many to generate.
+    //list of obstacles to generate and how many to generate. order in list determine drawing order
     //argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, oType 
     let templatesUpper = [//upper ground
       [1, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance, true],//testing. specified location for convenience
       [0, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock, true],
-      [0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house, true],
-      [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree, true],
       [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush, true],
       [0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance, true],
+      [0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house, true],
+      [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree, true],
     ];
     let templatesUnder = [//under ground
       [0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance, false],
@@ -1104,6 +1102,32 @@
     this.ws.send(  server_packet  );
   
   }; //game_core.client_handle_input
+
+  //client side zone processing to determine graphics
+  game_core.prototype.client_handleZones = function(){
+
+    this.gtoggledObstacles.clear();//refresh obstacles to toggle graphics
+
+    this.currentPlayers.forEach((player) => {
+      //called directly after server update. should all be active players
+      //if(debug && !(player.state === Game.enums.PState.active)) console.log(`client_handlezones: player state: ${player.state} pId: ${player.pID}`);
+      
+      this.map.handleZones(player);
+
+      //change obstacles' graphics based on self zones
+      if(player.pID !== this.self.pID) return;
+      player.zones.forEach((zID, zType) => {
+        //certain types of zones when occupied by self change graphics
+        if(zType === Game.enums.ZType.hiding){
+          if(debug) console.assert(this.map.zones.get(zID).oID !== undefined);
+
+          //optimize. ?? neater way to handle toggled graphics of obstacles?
+          this.gtoggledObstacles.add(this.map.zones.get(zID).oID);
+        }
+      });
+
+    });
+  }
   
   //todo only after basic game is up
   game_core.prototype.client_process_net_prediction_correction = function() {
@@ -1418,7 +1442,8 @@
   }
 
   game_core.prototype.client_onserverupdate_received= function(data){
-
+      //update everything graphics related together here before prediction to prevent jitter. todo. move updates to physics_update(or somewhere else ?? ) once have prediction 
+        
       //if connection is not ready don't do anything
       if(!this.connectionReady) return;
 
@@ -1440,41 +1465,10 @@
   
       if(this.naive_approach) {
 
-        //update players including self
-        this.currPlayersID = []; 
-        for(let i = 0, l = update.players.length; i < l; i++){
-          let pID = update.players[i].pID;
-
-          //if(debug) {console.log('player update: pID: ' + pID + ' update: '); console.log(update.players[i]);}
-
-          this.currPlayersID.push(pID);//?? self is also pushed, should this be?
-          this.players.get(pID).handleServerUpdate(update.players[i]);
-        }
-
-        //add new fires
-        let t = Date.now();//put it here for now until proper physics and server update on client
-        for(let i = 0, l = update.fires.length; i < l; i++){
-          let instance = update.fires[i];
-          //for now only have bullets
-          let fire = this.client_createFire(instance);
-
-          //if(debug) console.log('new fire: fID: ' + fire.fID);
-
-          this.fires.set(fire.fID, fire);//fid as index
-        }
-
-        //remove fires with their fid
-        for(let i = 0, l = update.removedFires.length; i < l; i++){
-          let fire = this.fires.get(update.removedFires[i]);
-
-          //if(debug) console.log('remove fire: fID: ' + update.firesRemoved[i]);
-
-          if(fire) fire.terminate = true;//check because it might already be removed by client side update
-        }
         //update objects
         for(let i = 0, l = update.updatedObjects.length; i < l; i++){
           const instance = update.updatedObjects[i];
-          const obj = this.map.objects.get(instance.jID); 
+          const obj = this.map.objects.get(instance.jID);
           if(!obj) return;//object might not exist anymore
 
           obj.health = instance.health;
@@ -1500,10 +1494,41 @@
           }    
         }
 
-        //update everything graphics related together here before prediction to prevent jitter. todo. move updates to physics_update(or somewhere else ?? ) once have prediction 
+        //update players including self
+        this.currentPlayers = []; 
+        for(let i = 0, l = update.players.length; i < l; i++){
+          const player = this.players.get(update.players[i].pID);
+
+          //if(debug) {console.log('player update: pID: ' + pID + ' update: '); console.log(update.players[i]);}
+          if(debug && !player) console.log(` ::ERROR:: server update received: player is undefined: pID: ${update.players[i].pID}`);
+          this.currentPlayers.push(player);
+          player.handleServerUpdate(update.players[i]);
+        }
+
+        //update graphic changes due to zones here
+        this.client_handleZones();
+
+        //add new fires
+        let t = Date.now();//put it here for now until proper physics and server update on client
+        for(let i = 0, l = update.fires.length; i < l; i++){
+          let instance = update.fires[i];
+          //for now only have bullets
+          let fire = this.client_createFire(instance);
+
+          //if(debug) console.log('new fire: fID: ' + fire.fID);
+
+          this.fires.set(fire.fID, fire);//fid as index
+        }
+
+        //remove fires with their fid
+        for(let i = 0, l = update.removedFires.length; i < l; i++){
+          let fire = this.fires.get(update.removedFires[i]);
+
+          //if(debug) console.log('remove fire: fID: ' + update.firesRemoved[i]);
+
+          if(fire) fire.terminate = true;//check because it might already be removed by client side update
+        }
         
-        this.camera.update(this.map.cellSizeg, this.map.gridWg);//update camera coords right after self update. otherwise coors don't synchronize and jitter happens
-  
         //update fires
         this.fires.forEach((fire) => {
           //map not involved on client side yet
@@ -1518,6 +1543,8 @@
           }
           fire.update(t);
         });
+
+        this.camera.update(this.map.cellSizeg, this.map.gridWg);//update camera coords right after self update. otherwise coors don't synchronize and jitter happens
   
       } else {
         //todo only after basic game is up.
@@ -1591,7 +1618,7 @@
     const subGridXMax = this.camera.subGridXMax;
     const subGridYMax = this.camera.subGridYMax;
 
-      //Clear the screen area
+    //Clear the screen area
     ctx.clearRect(0, 0, width, height);
     
     this.map.drawBackground(ctx, xView, yView, width, height, scale, upperGround, subGridX, subGridY, subGridXMax, subGridYMax);
@@ -1612,21 +1639,27 @@
     this.fires.forEach(fire => {
       fire.draw(ctx, xView, yView, scale);
     })
-    //if(debug) console.log('client update: players(other) length: ' + this.currPlayersID.length);
+    //if(debug) console.log('client update: players(other) length: ' + this.currentPlayers.length);
     
     //draw players including self
-    for(let i = 0, l = this.currPlayersID.length; i < l; i++){
-      this.players.get(this.currPlayersID[i]).draw(ctx, xView, yView, scale);
+    for(let i = 0, l = this.currentPlayers.length; i < l; i++){
+      const player = this.currentPlayers[i];
+
+      //apply changes to graphics based on zType
+      if(player.zones.has(Game.enums.ZType.hiding)) player.transparency = 0.6;
+      
+      player.draw(ctx, xView, yView, scale);
+      
     }
 
     //obstacles come last
     this.drawObstacles(ctx, xView, yView, scale, subGridX, subGridY, subGridXMax, subGridYMax);
 
-    //player map, mini map and stats don't care about scale. 
-    if(this.showMap) this.drawPlayerMap(ctx, width, height);
-
     //always draw minimap
     this.drawMiniMap(ctx, width, height);
+
+    //player map, mini map and stats don't care about scale. 
+    if(this.showMap) this.drawPlayerMap(ctx, width, height);
 
     //draw stats
     this.drawStats(ctx, width, height);
@@ -1653,6 +1686,7 @@
      */
     /**
      * ??
+     * Best way to identify obstacles for different graphics?
      * Should clients process zones to determine graphics or all on server?
      * Cleaner way to mark this for visibility identification? 
      *  if two hidings overlap(artificial smoke etc) then how does this work? 
@@ -1683,7 +1717,11 @@
           if(debug) console.assert(obj.oID !== undefined);
           if(drawn[obj.oID]) return;//if already drawn
 
-          obstacles.get(obj.oID).draw(context, xView, yView, scale);
+          //some obstacles have different graphics under certain situations
+          let toggle = false;//optimize. don't need to store it
+          if(this.gtoggledObstacles.has(obj.oID)) toggle = true;
+
+          obstacles.get(obj.oID).draw(context, xView, yView, scale, toggle);
           drawn[obj.oID] = true;
         });
       }
@@ -2020,6 +2058,7 @@
       break;
     }
 
+    if(debug && typeof this.client_gameOverInterface !== 'function') console.log(`gameOverInterface is not a function: type: ${typeof this.client_gameOverInterface}`);
     this.client_gameOverInterface(msg);
   }
 
@@ -2054,9 +2093,9 @@
       }
     }
 
-    this.self.pID = serverResponse.pID;//now self has pID
+    this.self.pID = serverResponse.pID;//now self has pID, add self to regular players list
     this.self.tID = serverResponse.tID;
-    this.players.set(this.self.pID, this.self);//now add self to regular players list
+    this.players.set(this.self.pID, this.self);
     this.connectionReady = true;//connection is only ready when we have the pID
 
     if(debug) console.assert(this.self.pID !== undefined);

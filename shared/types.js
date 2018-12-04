@@ -76,11 +76,12 @@ Game.enums = {
     this.gList;//which list in each gridg cell to occupy to optimize grid iteration
 
     this.color = 'rgb(153, 0, 0)';//default color is maroon
+    this.transparency;//default to no special transparency
     
     this.upperGround;//externally assigned
     /** 
-     * obstacle part only
-     * this.objectDied;
+     * obstacle part or zones only
+     * this.opType;
      * this.sprite;
      * this.dx;
      * this.dy;
@@ -101,7 +102,6 @@ Game.enums = {
     /**
      * zones only
      * this.zID;
-     * this.oID;
      * this.zType;
      */
     
@@ -431,12 +431,18 @@ Game.enums = {
     const radius = Math.round(this.radius * scale);
 
     //simply drawing circle does not require turning
+    context.save();
     context.fillStyle = this.color;
+    if(this.transparency !== undefined) context.globalAlpha = this.transparency;
+
     context.beginPath();
 		// convert player world's position to canvas position			
     context.arc(x, y, radius, 0, 2 * PI);
     context.fill();
     context.closePath();
+    context.restore();
+    this.transparency = undefined;//revert to default
+
     //if(debug) console.log(`circle draw: x: ${x} y: ${y}`);
   }
   Circle.prototype.checkCollide = function(other){//other is always unpassable
@@ -657,7 +663,7 @@ Game.enums = {
     this.x = x;
     this.y = y;
   }
-  Entity.prototype.draw = function(context, xView, yView){
+  Entity.prototype.draw = function(context, xView, yView){//optimize. partially repeating circle draw.
     const angle = this.angle;
 
     //if(debug) console.log('entity.draw: pID: ' + this.pID + ' angle: ' + angle);
@@ -666,6 +672,8 @@ Game.enums = {
     //if(debug) console.log(this.x - xView, this.y - yView);
     context.translate(this.x-xView, this.y - yView); //convert player position to canvas postiion
     context.rotate(angle - PI/2);//to compensate for vertical weapon sprites, tweek the angle when drawing.
+
+    if(this.transparency !== undefined) context.globalAlpha = this.transparency;
 
     this.lWeapon.draw(context); 
     this.rWeapon.draw(context);
@@ -678,6 +686,7 @@ Game.enums = {
     context.closePath();
     
     context.restore();
+    this.transparency = undefined;//revert back to default
   }
 
   //?? awkward method. where should animation be updated?

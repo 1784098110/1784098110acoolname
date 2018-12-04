@@ -163,11 +163,10 @@ window.onload = function(){
 	
 		//Create our game client instance without actual game and player info
 	//const start = Date.now();
-	game = new game_core(false); //it's not global, a let in the closure
+	game = new game_core(false, undefined, gameOverInterface.bind(this)); //it's not global, a let in the closure
 
 	//if(debug) console.log(`gamecore construct time: ${Date.now() - start}`);
 
-	game.client_gameOverInterface = gameOverInterface.bind(this);//otherwise how to know when gameover
 	const gameDiv = document.getElementById('game');
 
 	fetchSprites();//start fetching necessary sprites
@@ -244,7 +243,7 @@ window.onload = function(){
 		game.ws.close();//close connection, which would kill game
 		homeWindow();//go to menu screen
 
-		game = new game_core(false);//create new game object
+		game = new game_core(false, undefined, gameOverInterface.bind(this));//create new game object
 	}, false);
 	
 

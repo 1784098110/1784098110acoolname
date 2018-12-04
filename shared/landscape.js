@@ -111,9 +111,8 @@
     if(debug) console.assert(obj.upperGround !== undefined);
 
     //add glist here once for all since zones won't be readded
-    if(debug) console.assert(obj.gList === undefined);
-    obj.gList = Game.enums.GList.zone;
-    const gList = Game.enums.GList.zone;
+    if(debug) console.assert(obj.gList === Game.enums.GList.zone);
+    const gList = obj.gList
 
     let grid, gridg;//logic grid has zone and objects separated. but combined in graphic grid
     [grid, gridg] = (obj.upperGround === true) ? [this.zoneGridUpper, this.gridgUpper] : [this.zoneGridUnder, this.gridgUnder];
@@ -433,7 +432,7 @@
       }
     }
   }
-  //if the object does not fit in the zone it touches
+  //return true if obj collide with any zone. todo. should differentiate ztypes
   Land.prototype.checkZones = function(obj){
     /*todo. ?? instead of randomly assign pos and check zones. 
     get an algorithm that plans out pos beforehand? or let objs adjust pos upon collision?*/
@@ -717,7 +716,6 @@
       part.upperGround = this.upperGround;
       part.angle = this.angle;
       part.gList = Game.enums.GList.obstacle;
-      part.obstacleDied = false;
 
       if(this.healthPart){//meaning if obstacle's size changes with health of a certain part. these should not contain points and lines
         const health = this.healthPart.health;
@@ -757,11 +755,50 @@
       part.x = this.x + dx;
       part.y = this.y + dy;
     });
+    //do the same to zones except zones don't need bounds since no collide
+    this.zones.forEach(part => {
+      //oid is externally assigned
+      part.upperGround = this.upperGround;
+      part.angle = this.angle;
+      part.gList = Game.enums.GList.zone;
 
-    //process zones are simpler. obstacles that change size do not affect zones 
-    this.zones.forEach(zone => {
-      //zones set their own angle for now and don't have bounds since they don't collide
-      zone.upperGround = this.upperGround;
+      if(this.healthPart){//meaning if obstacle's size changes with health of a certain part. these should not contain points and lines
+        const health = this.healthPart.health;
+        if(part.shape === Game.enums.Shape.rectangle){
+          //keep ratios to change obstacles size upon damage
+          part.baseWidth = Math.round(part.width * this.baseSizeRatio);
+          part.baseHeight = Math.round(part.height * this.baseSizeRatio);
+          part.widthToHealth = (part.width - part.baseWidth) / health;
+          part.heightToHealth = (part.height - part.baseHeight) / health;
+        }
+        if(part.shape === Game.enums.Shape.circle){
+          //keep ratios to change obstacles size upon damage
+          part.baseRadius = Math.round(part.radius * this.baseSizeRatio);
+          part.radiusToHealth = (part.radius - part.baseRadius) / health;
+        }
+      }
+
+      //parts are made for angle === 0. adjust them to actual angle
+      //first flip height and width if necessary
+      if((part.width !== undefined) && (part.width !== part.height)){//a circle or square has no resizing
+        //if(debug) console.log('obstacles construct adjust parts angle not square: angle: ' + this.angle);
+        if((Math.abs(this.angle - PI / 2) < 0.1) || (Math.abs(this.angle - 3 * PI / 2) < 0.1)){
+          //if(debug) console.log(`obstacles construct adjust angled parts: x: ${part.x} y: ${part.y} w: ${part.width} h: ${part.height} angle: ${part.angle}`);
+          [part.width, part.height] = [part.height, part.width];  
+
+        } 
+      }
+      if(part.dx === undefined) return; //if part has no coor offset this is all the adjustment required
+      
+      let dx = 0;
+      let dy = 0;
+      if(Math.abs(this.angle - PI / 2) < 0.1) [dx, dy] = [-part.dy, part.dx];
+      else if(Math.abs(this.angle - 3 * PI / 2) < 0.1) [dx, dy] = [part.dy, -part.dx];
+      else if(Math.abs(this.angle - PI) < 0.1) [dx, dy] = [-part.dx, -part.dy];
+      else if(this.angle === 0) [dx, dy] = [part.dx, part.dy];
+      //else if(debug) console.log(' :: ERROR: obstacle reoriente: no matching angle: ' + this.angle);
+      part.x = this.x + dx;
+      part.y = this.y + dy;
     });
   }
 
@@ -784,19 +821,40 @@
     this.x = x;
     this.y = y;
     
-    //else reposition parts. 
+    //else reposition parts and zones 
     this.parts.forEach(part => {
+      part.x += dx;
+      part.y += dy;
+    });
+    this.zones.forEach(part => {
       part.x += dx;
       part.y += dy;
     });
 
   }
-  Obstacle.prototype.draw = function(context, xView, yView, scale){
+  Obstacle.prototype.draw = function(context, xView, yView, scale, toggle){
     //todo. when drawing on player map use special mini sprites for different obstacles as a whole 
 
-    this.parts.forEach(part => {
+    if(!toggle){//normal graphics
+      this.parts.forEach(part => {
+        part.draw(context, xView, yView, scale);
+      });
+      return;
+    }
+    //else depends on oType
+    switch(this.oType){
+      case(Game.enums.OType.bush):
+      //if(debug) console.log(`obstacle draw: bush toggled: oID: ${this.oID}`);
+      let part = this.parts.get(Game.enums.OPType.bush);
+      part.transparency = 0.5;//when bush toggles it becomes semi transparent
       part.draw(context, xView, yView, scale);
-    });
+      return;
+
+      default:
+      if(debug) console.log(` :: ERROR :: obstacle draw: toggle: no matching oType`);
+    }
+
+    
   }
   //called when a part of obstacle changes stats return true if obstacle is dead
   Obstacle.prototype.update = function(part){
@@ -924,7 +982,7 @@
     
     //hiding places are indestructible
     const bush = new Game.Circle(radius, this.x, this.y, this.angle, true, undefined);
-    bush.color = 'rgba(0,102,0, 0.9)';
+    bush.color = 'rgba(0,102,110, 1)';
     bush.opType = Game.enums.OPType.bush;
 
     this.parts.set(bush.opType, bush);
@@ -1010,6 +1068,7 @@
       zone.upperGround = this.upperGround;
       zone.color = 'aqua';//testing
       zone.zType = Game.enums.ZType.water;
+      zone.gList = Game.enums.GList.zone;
 
     });
 
