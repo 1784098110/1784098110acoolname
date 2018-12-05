@@ -15,6 +15,7 @@
   require('../shared/fires.js');
   require('../shared/landscape.js');
   require('../shared/helpers.js');
+  require('../server/profiler.js').init(__dirname + '/data');
 
   //outside libraries needed by game mechanism
   window.MersenneTwister = require('mersenne-twister');
@@ -43,7 +44,7 @@
 
   //specefic to this particular game room/server
   game_server.port = 3000;
-  game_server.ip = 'localhost';
+  game_server.ip = '172.31.5.159';
 
   //specific to game mode
   game_server.width = 20000;

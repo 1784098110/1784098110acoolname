@@ -667,11 +667,11 @@
     //argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, oType 
     let templatesUpper = [//upper ground
       [1, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
-      [0, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
-      [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
+      [200, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
+      [300, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
       [0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance],
-      [0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
-      [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
+      [100, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
+      [200, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
     ];
     let templatesUnder = [//under ground
       [0, 80, 80, 540, 440, 360, 360, Game.enums.OType.entrance],
