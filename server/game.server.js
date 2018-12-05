@@ -46,8 +46,8 @@
   game_server.ip = 'localhost';
 
   //specific to game mode
-  game_server.width = 2000;
-  game_server.height = 2000;
+  game_server.width = 20000;
+  game_server.height = 20000;
   game_server.cellSize = 50;
   game_server.mapSeed;//generated each time game is created
 

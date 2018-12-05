@@ -585,7 +585,7 @@
     
     //draw relevant zones
     const gList = Game.enums.GList.zone;
-    const grid = upperGround ? this.gridgUpper : this.map.gridgUnder;
+    const grid = upperGround ? this.gridgUpper : this.gridgUnder;
     const drawn = [];
 
     //iterating occupied logic grid to get relevant obstacles to draw
@@ -922,7 +922,7 @@
 
     this.healthPart = rock;
 
-    if(debug) console.log(`rock construct: radius: ${radius} health: ${health}`);
+    //if(debug) console.log(`rock construct: radius: ${radius} health: ${this.healthPart.health}`);
   }
   Obstacle.prototype.house = function(){
 
@@ -1014,6 +1014,11 @@
 
     //terrian specific parameters put toether for maintainability
     this.riverWidthMin = 200;
+    this.riverBranchCount = 0;
+    this.riverBranchLimit = 8;
+    this.riverAngleRange = PI / 10;
+    this.riverBranchAngleRange = PI / 4;
+    this.riverBranchProbability = 0.05;
 
     switch(this.tType){//different terrians are differently generated
       case(Game.enums.TType.river):
@@ -1105,8 +1110,8 @@
     } 
     //if(debug)console.log(`terrian addrivertile: xe: ${xe} ye: ${ye} xmin: ${this.xMin} xmax: ${this.xMax} ymin: ${this.yMin} ymax: ${this.yMax} `);
     //else lookahead is in bound then normal progression
-    const branch = (h > this.riverWidthMin) && (this.generator.random() < 0.05);//todo. magic numbers, chance of branching, and no branching if river's already too thin
-    if(branch) return this.branchRiverTile(w, h, l, phi, x, y, angle, false);
+    const branch = (h > this.riverWidthMin) && (this.generator.random() < this.riverBranchProbability);//chance of branching, and no branching if river's already too thin
+    if(branch && this.riverBranchCount < this.riverBranchLimit) return this.branchRiverTile(w, h, l, phi, x, y, angle, false);
     else{//else continue normally
       const upTurn = Math.floor(this.generator.random() * 2);//randomly assign new upTurn
       return this.normalRiverTile(w, h, l, phi, x, y, angle, upTurn);
@@ -1121,8 +1126,8 @@
     const xa = (Math.cos(theta) * l) + x;
 
     //new tile's angle. ensure zigzag effect
-    const aMin = upTurn ? angle - PI / 8 : angle;
-    const angle1 = this.generator.random() * (PI / 8) + aMin;
+    const aMin = upTurn ? angle - this.riverAngleRange : angle;
+    const angle1 = this.generator.random() * this.riverAngleRange + aMin;
 
     //get new tile's coor
     const reverseAngle = upTurn ? (angle1 - phi) : (angle1 + phi);
@@ -1138,6 +1143,8 @@
   }
   Terrian.prototype.branchRiverTile = function(w, h, l, phi, x, y, angle, mBranch){//mBranch means if this is merge branch or normal branch(angle difference)
 
+    this.riverBranchCount++;//to have a limit on nubmer of branches
+
     //get coor of two front anchor corners
     const theta1 = angle + phi;
     const theta2 = angle - phi;
@@ -1149,14 +1156,14 @@
     //new tiles' angles depending on merge branch or normal branch
     let aMin1, aMin2, angle1, angle2;
     if(mBranch){//merge branch have small angles
-      [aMin1, aMin2] = [angle - PI / 8, angle];
-      angle1 = this.generator.random() * (PI / 8) + aMin1;
-      angle2 = this.generator.random() * (PI / 8) + aMin2;
+      [aMin1, aMin2] = [angle - this.riverAngleRange, angle];
+      angle1 = this.generator.random() * this.riverAngleRange + aMin1;
+      angle2 = this.generator.random() * this.riverAngleRange + aMin2;
     }
     else{//normal branch has a big deviation
-      [aMin1, aMin2] = [angle - PI / 4, angle + PI / 4];
-      angle1 = this.generator.random() * (PI / 4) + aMin1;
-      angle2 = this.generator.random() * (PI / 4) + aMin2;
+      [aMin1, aMin2] = [angle - this.riverBranchAngleRange, angle + this.riverBranchAngleRange];
+      angle1 = this.generator.random() * this.riverBranchAngleRange + aMin1;
+      angle2 = this.generator.random() * this.riverBranchAngleRange + aMin2;
     }
 
     //get new tile's coor

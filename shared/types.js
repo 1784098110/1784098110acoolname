@@ -798,6 +798,10 @@ Game.enums = {
       if(obj.radius < this.radius || obj.width < this.radius * 2 || obj.height < this.radius * 2) setZone = false;
       break;
 
+      case(Game.enums.ZType.entrance):
+      this.upperGround = false;
+      break;
+
     }
     if(setZone) this.zones.set(obj.zType, obj.zID);
   }
@@ -974,8 +978,8 @@ Game.enums = {
 		this.height = canvasHeight;
     
     // distance from followed object to border before camera starts move
-    this.xDeadZone = Math.floor(this.width/2);
-    this.yDeadZone = Math.floor(this.height/2);
+    this.xDeadZone = (this.width/2);
+    this.yDeadZone = (this.height/2);
 
     // position of camera (left-top coordinate). assigned when following
 		this.xView;
@@ -1008,24 +1012,32 @@ Game.enums = {
     this.scale = 1;//todo. when clien viewport size changes
   }
 	Camera.prototype.update = function (cellSize, gridW) {//graphic grid cellsize and width
-		// keep following the player (or other desired object)
-		if (this.followed) {
-      if (this.followed.x - this.xView + this.xDeadZone > this.width)
-        this.xView = this.followed.x - (this.width - this.xDeadZone);
-      else if (this.followed.x - this.xDeadZone < this.xView)
-        this.xView = this.followed.x - this.xDeadZone;
-
-      if (this.followed.y - this.yView + this.yDeadZone > this.height)
-        this.yView = this.followed.y - (this.height - this.yDeadZone);
-      else if (this.followed.y - this.yDeadZone < this.yView)
-        this.yView = this.followed.y - this.yDeadZone;
-    }
+    // keep following the player (or other desired object)
     
-    //update the grid coors of the bounds of the buffer graphics to be drawn
-    const xView = this.xView;
-    const yView = this.yView;
     const wView = this.width;
     const hView = this.height;
+    /*
+		if (this.followed) {
+      var xView = 0,
+          yView = 0;
+      if (this.followed.x - this.xView + this.xDeadZone > this.width)
+        xView = this.followed.x - (this.width - this.xDeadZone);
+      else if (this.followed.x - this.xDeadZone < this.xView)
+        xView = this.followed.x - this.xDeadZone;
+
+      if (this.followed.y - this.yView + this.yDeadZone > this.height)
+        yView = this.followed.y - (this.height - this.yDeadZone);
+      else if (this.followed.y - this.yDeadZone < this.yView)
+        yView = this.followed.y - this.yDeadZone;
+    }*/
+
+    this.xView = this.followed.x - this.xDeadZone;
+    this.yView = this.followed.y - this.yDeadZone;
+    
+    //update the grid coors of the bounds of the buffer graphics to be drawn
+    
+    const xView = this.xView;
+    const yView = this.yView;
 
     //if(debug && !(xView && yView && wView && hView)) console.log(`camera update: xView: ${xView} yView: ${yView} wView: ${wView} hView: ${hView} `)
 
