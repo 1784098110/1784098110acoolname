@@ -264,7 +264,7 @@
         if(!obstacle) return;//obstacle might already be removed
         if(obstacle.update(obj)){//obstacle update return true if obstacle also dies
           this.removeObstacle(obstacle);
-          if(debug) console.log(`Obstacle ${obj.oID} died`);
+          //if(debug) console.log(`Obstacle ${obj.oID} died`);
         }
         else if(obj.health <= 0){
           obstacle.parts.delete(obj.opType);
@@ -661,22 +661,37 @@
     const height = this.map.height;
     if(debug) console.assert(width && height);
 
+    //terrian goes first and does not check for collision
     this.map.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
+
+    //complexes, get big ones first
+    //argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, cType 
+    let complexTemplatesUpper = [//upper ground
+      [1, 200, width - 200, 200, height - 200, Game.enums.CType.bushFence]
+    ];
+    complexTemplatesUpper.forEach((template) => {
+      let count = template[0];
+      template.splice(0, 1);//take out count when passing in to obstacle constructor
+      for(let i = 0; i < count; i ++){
+        this.addComplex(undefined, ...template, true, generator, 0);//find a place for it on map and then create
+      } 
+    });
 
     //list of obstacles to generate and how many to generate. order in list determine drawing order
     //argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, oType 
     let templatesUpper = [//upper ground
-      [1, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
-      [200, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
-      [300, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
+      [0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
+      [10, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
+      [10, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
+      [10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
       [0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance],
-      [100, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
-      [200, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
+      [0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
+      [20, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
     ];
-    let templatesUnder = [//under ground
+    let templatesUnder = [//under ground not implemented right now. todo. just make them special houses?
       [0, 80, 80, 540, 440, 360, 360, Game.enums.OType.entrance],
       [0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],
-      [20, 60, 120, 100, width - 100, 100, height - 100, Game.enums.OType.rock],
+      [0, 60, 120, 100, width - 100, 100, height - 100, Game.enums.OType.rock],
       [0, 100, 400, 100, width - 100, 100, height - 100, Game.enums.OType.house],
       [0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
     ];
@@ -687,64 +702,164 @@
       let count = template[0];
       template.splice(0, 1);//take out count when passing in to obstacle constructor
       for(let i = 0; i < count; i ++){
-        let ob = new Game.Obstacle(...template, true, generator);//create the obstacle
-        tooManyCollideCounterUpper += this.addObstacle(ob, 0);//find a place for it on map
+        tooManyCollideCounterUpper += this.addObstacle(undefined, ...template, true, generator, 0);//find a place for it on map then create obstacle
       } 
     });
     templatesUnder.forEach((template) => {
       let count = template[0];
       template.splice(0, 1);//take out count when passing in to obstacle constructor
       for(let i = 0; i < count; i ++){
-        let ob = new Game.Obstacle(...template, false, generator);//create the obstacle
-
-        tooManyCollideCounterUnder += this.addObstacle(ob, 0);//find a place for it on map
+        tooManyCollideCounterUnder += this.addObstacle(undefined, ...template, false, generator, 0);//find a place for it on map then create obstacle
       } 
     });
 
     if(debug) console.log(`generateMap: instances of too many failed fittings: upper: ${tooManyCollideCounterUpper} under: ${tooManyCollideCounterUnder} obstacles count: ${this.obstacles.size}`);
   }
-  //add one obstacle object based on passed in template and pseudorandom num generator, also make sure no collides
-  game_core.prototype.addObstacle = function(obj, count){
+  //add one complex(specific arrangements of obstacles) based on passed in template and pseudorandom num generator, also make sure no collides
+  game_core.prototype.addComplex = function(angle, xMin, xMax, yMin, yMax, cType, upperGround, generator, count){
 
     //count how many times have tried to fit one obstacle. 
     if(count === undefined) count = 0;
     let collide = false;
 
-    //for each physical part: add to map and check collides. if yes get new positoin and start over
-    obj.parts.forEach((part) => {
-      if(collide) return;//one collide is enough no need to continue
+    //generate new coor within bound
+    const x = Math.round(generator.random() * (xMax - xMin)) + xMin;
+    const y = Math.round(generator.random() * (yMax - yMin)) + yMin;
 
-      this.map.addObject(part);
-      if(this.map.checkCollides(part) || this.map.checkZones(part)) collide = true;
-      this.map.removeObject(part);//need to remove even if this part fits otherwise can't remove it if another part doesn't fit midway through collision checking. ?? better way?
-    });
+    //only get new angle on first attempt
+    if(angle === undefined){
+      //decide on angle then flip width and height if necessary
+      angle = Math.floor(generator.random() * 4) * (PI / 2);
+    }
+
+    //use a rectangle or circle to estimate space allocation
+    //decide estimate size based on Ctype. 
+    let placeHolder, radius, width, height;
+    switch(cType){
+      case(Game.enums.CType.bushFence):
+      width = 200;
+      height = 200;
+      break;
+
+      default:
+      if(debug) console.log(` ::ERROR:: addcomplex no matching cType: ${cType}`);
+    }
+    
+    if(debug) console.assert(angle !== undefined);
+
+    //plug in placeholder to map to see collision
+    if(radius !== undefined) placeHolder = new Game.Circle(radius, x, y, angle, false, undefined);
+    else if(width !== undefined) placeHolder = new Game.Rectangle(width, height, x, y, false, undefined);
+    placeHolder.upperGround = upperGround;
+    placeHolder.gList = Game.enums.GList.obstacle;
+    this.map.addObject(placeHolder);
+    if(this.map.checkCollides(placeHolder) || this.map.checkZones(placeHolder)) collide = true;
+    this.map.removeObject(placeHolder);
 
     if(collide){//start over if doesn't fit
-      if(++count > 5){
-        //if(debug) console.log('addobstacle: too many failed fittings');
-        return 1;//abandon obstacle after too many failed fittings
+      if(++count > 5){//magic number
+        //if(debug) console.log('addcomplex: too many failed fittings');
+        return 1;//abandon complex after too many failed fittings
       } 
+      return this.addComplex(angle, xMin, xMax, yMin, yMax, cType, upperGround, generator, count);
+    }
 
-      obj.scramblePosition();
-      return this.addObstacle(obj, count);
+    //else if fitted
+    const complex = new Game.Complex(x, y, angle, cType, upperGround, this.createOID.bind(this));
+
+    //add all obstacles, parts and zones ??. parts and obstacles repetitive? 
+    complex.zones.forEach(zone => {
+      this.map.addZone(zone);
+    });
+    complex.parts.forEach((part) => {
+      this.map.addObject(part);
+    });
+    complex.obstacles.forEach(obj => {
+      //add all parts and zones and add to list
+      obj.parts.forEach((part) => {
+        this.map.addObject(part);
+      });
+      obj.zones.forEach(zone => {
+        this.map.addZone(zone);
+      });
+      this.obstacles.set(obj.oID, obj);
+    });
+
+    //if(debug && obj.oType === Game.enums.OType.bush) console.log(`addobstacle: oType: ${obj.oType} zones length: ${obj.zones.length}`);
+    //if(debug) console.log(`addobstacle: oid: ${obj.oID} cellsg length: ${cellsgCount} x: ${obj.x} y: ${obj.y}`);
+    
+    return 0;
+  }
+  //add one obstacle object based on passed in template and pseudorandom num generator, also make sure no collides
+  game_core.prototype.addObstacle = function(angle, minSize, maxSize, xMin, xMax, yMin, yMax, oType, upperGround, generator, count){
+
+    //count how many times have tried to fit one obstacle. 
+    if(count === undefined) count = 0;
+
+    //generate new coor within bound
+    const x = Math.round(generator.random() * (xMax - xMin)) + xMin;
+    const y = Math.round(generator.random() * (yMax - yMin)) + yMin;
+
+    //only get new angle on first attempt
+    if(angle === undefined){
+      //decide on angle then flip width and height if necessary
+      angle = Math.floor(generator.random() * 4) * (PI / 2);
+    }
+
+    const circlePlaceHolder = [Game.enums.OType.tree, Game.enums.OType.rock, Game.enums.OType.bush];
+    const rectanglePlaceHolder = [Game.enums.OType.house, Game.enums.OType.entrance, Game.enums.OType.box];
+
+    //use a rectangle or circle to estimate space allocation
+    let placeHolder;
+    if(circlePlaceHolder.includes(oType)){
+      const radius = Math.round(generator.random() * (maxSize - minSize)) + minSize;
+      placeHolder = new Game.Circle(radius, x, y, angle, false, undefined);
+    }
+    else if(rectanglePlaceHolder.includes(oType)){
+      const width = Math.round(generator.random() * (maxSize - minSize)) + minSize;
+      const height = Math.round(generator.random() * (maxSize - minSize)) + minSize;
+      placeHolder = new Game.Rectangle(width, height, x, y, false, undefined);
+    }
+    else if(debug) console.log(` ::ERROR:: addobstacle no matching oType: ${oType}`);
+    
+    /*todo. not needed for now
+    if((width !== undefined) && (width !== height)){//a circle or square has no resizing
+      //if(debug) console.log('addcomplex adjust parts angle not square: angle: ' + this.angle);
+      if((Math.abs(angle - PI / 2) < 0.1) || (Math.abs(angle - 3 * PI / 2) < 0.1)){
+        //if(debug) console.log(`addcomplex adjust angled parts: x: ${part.x} y: ${part.y} w: ${part.width} h: ${part.height} angle: ${part.angle}`);
+        [width, height] = [height, width];  
+
+      } 
+    }*/
+    
+    //plug in map to see if no collide
+    let collide = false;
+    placeHolder.upperGround = upperGround;
+    placeHolder.gList = Game.enums.GList.obstacle;
+    this.map.addObject(placeHolder);
+    if(this.map.checkCollides(placeHolder) || this.map.checkZones(placeHolder)) collide = true;
+    this.map.removeObject(placeHolder);
+
+    if(collide){//start over if doesn't fit
+      if(++count > 5){//magic number
+        //if(debug) console.log('addobstacle: too many failed fittings');
+        return 1;//abandon after too many failed fittings
+      } 
+      return this.addObstacle(angle, minSize, maxSize, xMin, xMax, yMin, yMax, oType, upperGround, generator, count);
     }
 
     //else if fitted
     const oID = this.createOID();
-    obj.oID = oID;
-
+    const obj = new Game.Obstacle(placeHolder.radius, placeHolder.width, placeHolder.height, x, y, angle, oID, oType, upperGround);
+    
     //add all parts and zones and add to list
     obj.parts.forEach((part) => {
-      part.oID = oID;//parts have the same oID ?? best idea?
       //if(debug) console.log('map addobstacle: part upperGround: ' + part.upperGround);
       this.map.addObject(part);
     });
     obj.zones.forEach(zone => {
-      zone.oID = oID;
       this.map.addZone(zone);
     });
-    obj.generator = undefined;//generator's sequence matters. safer to nullify after use
-    //doesn't differentiate between ground levels
     this.obstacles.set(oID, obj);
 
     //if(debug && obj.oType === Game.enums.OType.bush) console.log(`addobstacle: oType: ${obj.oType} zones length: ${obj.zones.length}`);
@@ -847,7 +962,7 @@
         if(!obstacle) continue;//obstacle might already be removed
         if(obstacle.update(obj)){//obstacle update return true if obstacle also dies
           this.removeObstacle(obstacle);
-          if(debug) console.log(`Obstacle ${obj.oID} died`);
+          //if(debug) console.log(`Obstacle ${obj.oID} died`);
         }
         else if(obj.health <= 0){
           obstacle.parts.delete(obj.opType);
@@ -1680,11 +1795,12 @@
     
     /**
      * todotodo.
-     * groundlevel change
+     * 
      * 
      */
     /**
      * ??
+     * How to make sure obstacle hierarchy? (tree crown over others)
      * Best way to identify obstacles for different graphics?
      * Should clients process zones to determine graphics or all on server?
      * Cleaner way to mark this for visibility identification? 

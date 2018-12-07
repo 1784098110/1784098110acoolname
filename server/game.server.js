@@ -15,7 +15,7 @@
   require('../shared/fires.js');
   require('../shared/landscape.js');
   require('../shared/helpers.js');
-  require('../server/profiler.js').init(__dirname + '/data');
+  //require('../server/profiler.js').init(__dirname + '/data');
 
   //outside libraries needed by game mechanism
   window.MersenneTwister = require('mersenne-twister');
@@ -30,13 +30,13 @@
   };
 
   game_server.local_time = 0;
-  game_server._dt = new Date().getTime();
-  game_server._dte = new Date().getTime();
+  game_server._dt = Date.now();
+  game_server._dte = Date.now();
 
   //what for ??
   setInterval(function(){
-    game_server._dt = new Date().getTime() - game_server._dte;
-    game_server._dte = new Date().getTime();
+    game_server._dt = Date.now() - game_server._dte;
+    game_server._dte = Date.now();
     game_server.local_time += game_server._dt/1000.0;
   }, 4);
 
@@ -44,11 +44,11 @@
 
   //specefic to this particular game room/server
   game_server.port = 3000;
-  game_server.ip = '172.31.5.159';
+  game_server.ip = 'localhost';
 
   //specific to game mode
-  game_server.width = 20000;
-  game_server.height = 20000;
+  game_server.width = 2000;
+  game_server.height = 2000;
   game_server.cellSize = 50;
   game_server.mapSeed;//generated each time game is created
 

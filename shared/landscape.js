@@ -649,35 +649,30 @@
 })();
 //Obstacle
 (function(){
-  function Obstacle(minSize, maxSize, xMin, xMax, yMin, yMax, oType, upperGround, generator){//count is number of this obstacles on the map
+  function Obstacle(radius, width, height, x, y, angle, oID, oType, upperGround){//count is number of this obstacles on the map
 
     //if(debug) console.log('Obstacle construct: upperground: ' + upperGround);
 
-    this.minSize = minSize;
-    this.maxSize = maxSize;
-    this.xMin = xMin;
-    this.xMax = xMax;
-    this.yMin = yMin;
-    this.yMax = yMax;
+    this.radius = radius;
+    this.width = width;
+    this.height = height;
     this.oType = oType;
-    this.oID;//externally assigned
+    this.oID = oID;
     this.upperGround = upperGround;//for later fitting into the right portion of map
-
-    //?? should generator be saved? the order of calling matters, safer to pass
-    this.generator = generator;//pseudorandom num for convenience. should be nullified by map once location is set
 
     this.parts = new Map();//physical components of this obstacle
     this.zones = [];//zones that have special effect when entered
     
-    this.angle;//later assigned when put to map
-    this.x;//certain pre agreed anchor coor
-    this.y;
+    this.angle = angle;
+    this.x = x;//certain pre agreed anchor coor
+    this.y = y;
 
     this.healthPart;//if defined the entire obstacle changes size with a part's health
-    this.baseSizeRatio = 0.5;//parts that change size need a minimum size when health is zero
-
-    //get a pseudorandom position and angle
-    this.scramblePosition();
+    //parts that change size need a minimum size when health is zero
+    //this.baseSizeRatio = 0.5;
+    //fixed minimum size for all objects
+    this.baseWidth = 60;
+    this.baseRadius = 30;
 
     //assemble different obstacles from different parts
     switch(this.oType){
@@ -701,34 +696,57 @@
       this.bush();
       break;
 
+      case(Game.enums.OType.box):
+      this.box();
+      break;
+
       default:
       if(debug) console.log(' :: ERROR: obstacle construct no mathcing OType');
     
     }
-
+    
+    //if obstacle's size changes with health, set healthpart as the measuring stick of base size
+    if(this.healthPart){
+      const part = this.healthPart;
+      const health = this.healthPart.health;
+      if(part.shape === Game.enums.Shape.rectangle){
+        //keep ratios to change obstacles size upon damage
+        part.baseWidth = this.baseWidth;
+        part.baseHeight = Math.round(part.baseWidth / part.width * part.height);
+        part.widthToHealth = (part.width - part.baseWidth) / health;
+        part.heightToHealth = (part.height - part.baseHeight) / health;
+      }
+      else if(part.shape === Game.enums.Shape.circle){
+        //keep ratios to change obstacles size upon damage
+        part.baseRadius = this.baseRadius;
+        part.radiusToHealth = (part.radius - part.baseRadius) / health;
+      }
+    }
     //add bounds to all parts
     this.parts.forEach(part => {
       //oid is externally assigned
+      part.oID = this.oID;
       part.xMin = this.xMin;
       part.xMax = this.xMax;
       part.yMin = this.yMin;
       part.yMax = this.yMax;
       part.upperGround = this.upperGround;
-      part.angle = this.angle;
+      part.angle = this.angle;//optimize. circle already pass in angle at constructions, just pass in angle at other shapes' construct too
       part.gList = Game.enums.GList.obstacle;
 
-      if(this.healthPart){//meaning if obstacle's size changes with health of a certain part. these should not contain points and lines
+      //if obstacle's size changes with health of a certain part
+      if(this.healthPart && (part.opType !== this.healthPart.opType)){
         const health = this.healthPart.health;
         if(part.shape === Game.enums.Shape.rectangle){
           //keep ratios to change obstacles size upon damage
-          part.baseWidth = Math.round(part.width * this.baseSizeRatio);
-          part.baseHeight = Math.round(part.height * this.baseSizeRatio);
+          part.baseWidth = Math.round(part.width / (this.healthPart.width || this.healthPart.radius * 2) * (this.healthPart.baseWidth || this.healthPart.baseRadius * 2));
+          part.baseHeight = Math.round(part.baseWidth / part.width * part.height);
           part.widthToHealth = (part.width - part.baseWidth) / health;
           part.heightToHealth = (part.height - part.baseHeight) / health;
         }
-        if(part.shape === Game.enums.Shape.circle){
+        else if(part.shape === Game.enums.Shape.circle){
           //keep ratios to change obstacles size upon damage
-          part.baseRadius = Math.round(part.radius * this.baseSizeRatio);
+          part.baseRadius = Math.round(part.radius / (this.healthPart.radius || this.healthPart.width / 2) * (this.healthPart.baseRadius || this.healthPart.baseWidth / 2));
           part.radiusToHealth = (part.radius - part.baseRadius) / health;
         }
       }
@@ -740,7 +758,7 @@
         if((Math.abs(this.angle - PI / 2) < 0.1) || (Math.abs(this.angle - 3 * PI / 2) < 0.1)){
           //if(debug) console.log(`obstacles construct adjust angled parts: x: ${part.x} y: ${part.y} w: ${part.width} h: ${part.height} angle: ${part.angle}`);
           [part.width, part.height] = [part.height, part.width];  
-
+          if(this.healthPart) [part.widthToHealth, part.heightToHealth, part.baseWidth, part.baseHeight] = [part.heightToHealth, part.widthToHealth, part.baseHeight, part.baseWidth]
         } 
       }
       if(part.dx === undefined) return; //if part has no coor offset this is all the adjustment required
@@ -758,22 +776,24 @@
     //do the same to zones except zones don't need bounds since no collide
     this.zones.forEach(part => {
       //oid is externally assigned
+      part.oID = this.oID;
       part.upperGround = this.upperGround;
       part.angle = this.angle;
       part.gList = Game.enums.GList.zone;
 
-      if(this.healthPart){//meaning if obstacle's size changes with health of a certain part. these should not contain points and lines
+      //if obstacle's size changes with health of a certain part
+      if(this.healthPart && (part.opType !== this.healthPart.opType)){
         const health = this.healthPart.health;
         if(part.shape === Game.enums.Shape.rectangle){
           //keep ratios to change obstacles size upon damage
-          part.baseWidth = Math.round(part.width * this.baseSizeRatio);
-          part.baseHeight = Math.round(part.height * this.baseSizeRatio);
+          part.baseWidth = Math.round(part.width / (this.healthPart.width || this.healthPart.radius * 2) * (this.healthPart.baseWidth || this.healthPart.baseRadius * 2));
+          part.baseHeight = Math.round(part.baseWidth / part.width * part.height);
           part.widthToHealth = (part.width - part.baseWidth) / health;
           part.heightToHealth = (part.height - part.baseHeight) / health;
         }
-        if(part.shape === Game.enums.Shape.circle){
+        else if(part.shape === Game.enums.Shape.circle){
           //keep ratios to change obstacles size upon damage
-          part.baseRadius = Math.round(part.radius * this.baseSizeRatio);
+          part.baseRadius = Math.round(part.radius / (this.healthPart.radius || this.healthPart.width / 2) * (this.healthPart.baseRadius || this.healthPart.baseWidth / 2));
           part.radiusToHealth = (part.radius - part.baseRadius) / health;
         }
       }
@@ -800,37 +820,6 @@
       part.x = this.x + dx;
       part.y = this.y + dy;
     });
-  }
-
-  Obstacle.prototype.scramblePosition = function(){//pseudo randomly change position and angle
-
-    //generate new coor within bound
-    const x = Math.round(this.generator.random() * (this.xMax - this.xMin)) + this.xMin;
-    const y = Math.round(this.generator.random() * (this.yMax - this.yMin)) + this.yMin;
-
-    //only first time scramble get new angle
-    if(this.angle === undefined){
-      this.angle = Math.floor(this.generator.random() * 4) * (PI / 2);
-      this.x = x; 
-      this.y = y;
-      return;
-    } 
-    //if not first time remember old coor to get displacement
-    let dx = x - this.x;
-    let dy = y - this.y;
-    this.x = x;
-    this.y = y;
-    
-    //else reposition parts and zones 
-    this.parts.forEach(part => {
-      part.x += dx;
-      part.y += dy;
-    });
-    this.zones.forEach(part => {
-      part.x += dx;
-      part.y += dy;
-    });
-
   }
   Obstacle.prototype.draw = function(context, xView, yView, scale, toggle){
     //todo. when drawing on player map use special mini sprites for different obstacles as a whole 
@@ -870,7 +859,7 @@
             obj.radius = Math.round(health * obj.radiusToHealth) + obj.baseRadius;
             //if(debug) console.log(`obstacle update part: radius: ${obj.radius} optype: ${obj.opType} baseradius: ${obj.baseRadius} radiustohealth: ${obj.radiusToHealth}`);
           }
-          if(obj.shape === Game.enums.Shape.rectangle){
+          else if(obj.shape === Game.enums.Shape.rectangle){
             obj.width = Math.round(health * obj.widthToHealth) + obj.baseWidth;
             obj.height = Math.round(health * obj.heightToHealth) + obj.baseHeight;
           }
@@ -892,7 +881,7 @@
   Obstacle.prototype.tree = function(){
 
     //radius of trunk
-    let radius = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
+    let radius = this.radius;
     
     //assemble a tree
     let trunk = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.1);
@@ -912,7 +901,7 @@
   }
   Obstacle.prototype.rock = function(){
 
-    let radius = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
+    let radius = this.radius;
 
     let rock = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.3);
     rock.color = 'pink';
@@ -926,14 +915,14 @@
   }
   Obstacle.prototype.house = function(){
 
-    let width = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
-    let height = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
+    let width = Math.round(this.width * 4 / 5);
+    let height = Math.round(this.height * 2 / 3);
     let wh = Math.round(width / 2);
     let hh = Math.round(height / 2);
 
     let dx;
     let dy;
-
+    //todo. x and y also need to change to accomodate pre-set space. but house should be a complex anyway
     let part1 = new Game.Rectangle(width, height, this.x, this.y, false, 0.3);
     part1.color = 'green';
     part1.opType = Game.enums.OPType.house11;
@@ -961,8 +950,8 @@
   }
   Obstacle.prototype.entrance = function(){
     //testing
-    let width = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
-    let height = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
+    let width = this.width;
+    let height = this.height;
     
     let zone = new Game.Rectangle(width, height, this.x, this.y, true, undefined);
     zone.angle = this.angle + PI / 3;
@@ -972,7 +961,7 @@
     this.zones.push(zone);
   }
   Obstacle.prototype.bush = function(){
-    const radius = Math.round(this.generator.random() * (this.maxSize - this.minSize)) + this.minSize;
+    const radius = this.radius;
   
     const zone = new Game.Circle(radius, this.x, this.y, this.angle, true, undefined);
     zone.color = 'rgba(255,0,0, 0)';//hiding zone is invisible
@@ -989,9 +978,62 @@
     this.healthPart = bush;    
   
   }
+  Obstacle.prototype.box = function(){
+
+    const box = new Game.Rectangle(this.width, this.height, this.x, this.y, false, -1);
+    box.color = 'rgb(110, 30, 0)';
+    box.opType = Game.enums.OPType.box;
+
+    this.parts.set(box.opType, box);
+    this.healthPart = box;
+
+  }
 
 
   Game.Obstacle = Obstacle;
+})();
+
+//Complex
+(function(){
+
+  function Complex(x, y, angle, cType, upperGround, oidCreator){
+
+    this.x = x;
+    this.y = y;
+    this.angle = angle;
+    this.upperGround = upperGround;
+    this.oidCreator = oidCreator;//for the obstacles in complex, binded to gamecore
+
+    this.zones = [];
+    this.obstacles = [];
+    this.parts = [];//objects that are not independent obstacles
+
+    //ctype specific params
+    this.bushFenceWidth = 200;
+    this.bushFenceWidthCount = 3;
+
+    switch(cType){
+      case(Game.enums.CType.bushFence):
+      this.bushFence();
+      break;
+
+      default:
+      if(debug) console.log(`complex construct: no matching cType: ${cType}`);
+    }
+
+    this.oidCreator = null;
+  }
+
+  Complex.prototype.bushFence = function(){
+
+    const radius = Math.round(this.bushFenceWidth / this.bushFenceWidthCount / 2);
+
+    this.obstacles.push(new Game.Obstacle(radius, undefined, undefined, this.x - ((this.bushFenceWidthCount - 1) * radius), this.y - ((this.bushFenceWidthCount - 1) * radius), 0, this.oidCreator(), Game.enums.OType.bush, this.upperGround));
+    this.obstacles.push(new Game.Obstacle(radius, undefined, undefined, this.x - ((this.bushFenceWidthCount - 3) * radius), this.y - ((this.bushFenceWidthCount - 1) * radius), 0, this.oidCreator(), Game.enums.OType.bush, this.upperGround));
+    this.obstacles.push(new Game.Obstacle(radius, undefined, undefined, this.x - ((this.bushFenceWidthCount - 5) * radius), this.y - ((this.bushFenceWidthCount - 1) * radius), 0, this.oidCreator(), Game.enums.OType.bush, this.upperGround));
+  }
+
+  Game.Complex = Complex;
 })();
 
 //Terrian
