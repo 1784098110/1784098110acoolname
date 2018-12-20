@@ -455,28 +455,6 @@
     return({x: x, y: y});
   }
 
-  //return equippable weapon object of wType passed in as string
-  game_core.prototype.createWeapon = function(name){
-
-    let weapon;
-    //client side weapons get extra params for graphic
-    switch(name){ 
-      /**
-       * Weapon Params:
-       * 
-       * WClose: cool, dmg, range, (fire)life, spriteCount, name
-       * WShoot: cool, dmg, range, speed, length, spriteCount, name
-       * 
-       *  */
-      case 'katana':
-        weapon = new Game.Weapons.WClose(1000, 99, 62, 600, 8, name);
-        if(!this.server){weapon.addGraphic(Game.sprites[name], 0.8, 0.5, 0.5);}
-        break;}
-
-    return weapon;
-    
-  }
-
   //add a firing object to fire object list 
   game_core.prototype.server_addFire = function(obj){
       
@@ -1079,7 +1057,7 @@
       //add newly visible fires' construction params.
       visibles.newFires.forEach((fire) => {
         
-        update += fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.traveled + ',' + fire.left + ',' + fire.holdRadius + ';';
+        update += fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.traveled + ',' + fire.holdRadius + ';';
         //if(debug) console.log(`server update newFire: ${fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.traveled + ',' + fire.left + ';'}`);
         
       });
@@ -1485,8 +1463,8 @@
     update.angle= parseFloat(commands[4]);
     update.player = this.players.get(parseInt(commands[5], 10));
     update.traveled = (commands[6] === 'undefined') ? undefined : parseInt(commands[6], 10);
-    update.left = (commands[7] === 'undefined') ? undefined : commands[7] === 'true';
-    update.holdRadius = (commands[8] === 'undefined') ? undefined : parseInt(commands[8], 10);
+    //update.left = (commands[7] === 'undefined') ? undefined : commands[7] === 'true';
+    update.holdRadius = (commands[7] === 'undefined') ? undefined : parseInt(commands[7], 10);
 
     if(debug) console.assert(update.player);
     //if(debug) {console.log('fire update obj: '); console.log(update);}
@@ -1514,7 +1492,7 @@
   game_core.prototype.client_addFire = function(instance){
     let fire;
 
-    fire = new Game.Fire(instance.x, instance.y, instance.angle, instance.player, instance.wType, instance.traveled, instance.left, instance.holdRadius);
+    fire = new Game.Fire(instance.x, instance.y, instance.angle, instance.player, instance.wType, instance.traveled, instance.holdRadius);
 
     fire.fID = instance.fID;
 
@@ -1760,12 +1738,7 @@
     
     /**
      * todotodo.
-     * 
-     * 
-     * 
-     * revamp firing process: skills and weapons are one, share same enum. 
      *  
-     * let holdradius replace left? not necessary right now 
      * draw graphics based on level. replace glist with graphic levels, distinguish not by zone or fire etc
      * 
      */

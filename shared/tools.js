@@ -9,14 +9,11 @@
     this.spriteCount;
 
     this.wType = wType;
-    this.left;
-
     this.cool;
-    this.holdRadius;
+    this.holdRadius;//also used to indicate left or right hand
     this.length;
 
     this.fire;//method to be assigned based on wtype
-
     this.firing = false;//is this a necessary property ?? repetitive of cool?
     this.tID;
     this.player;
@@ -86,7 +83,7 @@
     this.player = player;
     this.tID = player.tID; 
 
-    this.left = left;
+    if(this.holdRadius && left === false) this.holdRadius = -this.holdRadius;
   }
   Tool.prototype.ready = function(){
     
@@ -137,7 +134,7 @@
     //x is the position of the weapon's end relative to center of player
     //canvas should be transformed to rotated to player's pos a orientation
 
-    const x = this.holdRadius ? (this.left ? (this.holdRadius) : (-this.holdRadius)) : 0;
+    const x = this.holdRadius;
 
     //?? how to properly and systematically set the size of weapon actually drawn?
     let width = this.spriteWidth;//optimize. too many assignments
@@ -166,7 +163,7 @@
     //differentiate between left and right hand and find the coor of far end of weapon(at rest state)
     let r = Math.sqrt(this.holdRadius * this.holdRadius + this.length * this.length);
     let angle1 = Math.atan2(this.holdRadius, this.length);
-    let angle2 = this.left ? (angle - angle1) : (angle + angle1);
+    let angle2 = angle - angle1;
     let x = Math.round(Math.cos(angle2) * r) + x1;
     let y = Math.round(Math.sin(angle2) * r) + y1;
     
@@ -184,13 +181,13 @@
     const y1 = this.player.y;
     const angle = this.player.angle;
 
-    const angle2 = this.left ? (angle - PI / 2) : (angle + PI / 2);
-    const x = Math.round(Math.cos(angle2) * this.holdRadius + x1);
-    const y = Math.round(Math.sin(angle2) * this.holdRadius + y1);
+    const angle2 = this.holdRadius > 0 ? (angle - PI / 2) : (angle + PI / 2);
+    const x = Math.round(Math.cos(angle2) * Math.abs(this.holdRadius) + x1);
+    const y = Math.round(Math.sin(angle2) * Math.abs(this.holdRadius) + y1);
 
     //if(debug) console.log(`closeFire: x1:${x1} y1:${y1} angle:${angle} x:${x} y:${y} wType:${this.wType} left:${this.left}`);
 
-    game.server_addFire(new Game.Fire(x, y, angle, this.player, this.wType, undefined, this.left, this.holdRadius));
+    game.server_addFire(new Game.Fire(x, y, angle, this.player, this.wType, undefined, this.holdRadius));
   }
   Tool.prototype.healFire = function(game, mx, my){
     const player = this.player;

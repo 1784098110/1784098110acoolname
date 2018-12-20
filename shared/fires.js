@@ -1,6 +1,6 @@
 (function(){
   //fire constructor assigns fire details based on wtype
-  function Fire(x, y, angle, player, wType, traveled, left, holdRadius){
+  function Fire(x, y, angle, player, wType, traveled, holdRadius){
     
     if(debug) console.assert(player.pID !== undefined);
     Game.Gobject.call(this, x, y, undefined, angle, undefined, undefined, undefined);
@@ -58,7 +58,6 @@
       this.length = this.range;
       this.x2 = this.x + Math.cos(this.angle) * this.length;
       this.y2 = this.y + Math.sin(this.angle) * this.length;
-      this.left = left;
       this.holdRadius = holdRadius;
       this.hitOnce = false;
       this.hurtOnce = true;
@@ -74,7 +73,6 @@
       this.radius = this.range;
       this.x2 = this.x + Math.cos(this.angle) * this.length;
       this.y2 = this.y + Math.sin(this.angle) * this.length;
-      this.left = left;
       this.holdRadius = holdRadius;
       this.hitOnce = false;
       this.hurtOnce = true;
@@ -239,9 +237,9 @@
 
     //update fire pos according to player pos
     //differentiate between left and right hand and find the coor of holding end of weapon optimize ?? a lot of computations each physics update
-    let angle2 = this.left ? (this.player.angle - PI / 2) : (this.player.angle + PI / 2);
-    this.x = Math.round(Math.cos(angle2) * this.holdRadius) + this.player.x;
-    this.y = Math.round(Math.sin(angle2) * this.holdRadius) + this.player.y;
+    let angle2 = this.holdRadius > 0 ? (this.player.angle - PI / 2) : (this.player.angle + PI / 2);
+    this.x = Math.round(Math.cos(angle2) * Math.abs(this.holdRadius)) + this.player.x;
+    this.y = Math.round(Math.sin(angle2) * Math.abs(this.holdRadius)) + this.player.y;
     this.angle = this.player.angle;
 
     if(this.shape === Game.enums.Shape.line){//line also needs to update other end coor
@@ -263,95 +261,4 @@
   }
 
   Game.Fire = Fire
-})();
-
-(function(){
-  function FClose(dmg, x, y, range, angle, life, left, holdRadius, player, wType, shape, hitOnce, hurtOnce, passable){
-    Game.Fire.call(this, dmg, x, y, range, angle, player, wType, shape, hitOnce || false, hurtOnce, passable);
-
-    //if(debug) console.log('fclose constructor');
-
-    this.life = life;
-    this.left = left;
-    this.holdRadius = holdRadius;
-
-  }
-
-  FClose.prototype = Object.create(Game.Fire.prototype);
-  FClose.prototype.constructor = FClose;
-
-
-
-  //only called on client. 
-  FClose.prototype.draw = function(context, xView, yView, scale){
-    
-    return;//close fires don't have own sprites(some might in the future)
-    /*
-    //draw a circle to visualize range.
-    context.fillStyle = 'blue';//TESTING
-    context.beginPath();
-    context.arc(this.x - xView, this.y - yView, this.range, 0, 2*PI);
-    context.fill();
-    context.closePath();
-    
-    //draw line to visualize range
-    context.save();
-    context.translate(this.x - xView, this.y - yView);
-    context.rotate(this.angle);
-    context.strokeStyle = 'blue';
-    context.beginPath();
-    context.moveTo(0,0);
-    context.lineTo(this.range, 0);
-    context.stroke();
-    context.restore();
-    */
-
-    //if(debug) console.log('fire draw: x: ' + this.x + ' y: ' + this.y + ' range: ' + this.range + ' angle: ' + this.angle);
-  }
-
-  Game.Fires.FClose = FClose;
-
-})();
-
-(function(){
-  function FShoot(dmg, x, y, range, angle, speed, player, wType, shape, traveled, hitOnce, hurtOnce){
-    Game.Fire.call(this, dmg, x, y, range, angle, player, wType, shape, hitOnce, hurtOnce);
-
-    this.traveled = traveled || 0;//on server the new fire would have traveled 0. but on client it might be already created before it entered client's view
-    this.speed = speed;//speed only applies to shoot fires
-  }
-
-  FShoot.prototype = Object.create(Game.Fire.prototype);
-  FShoot.prototype.constructor = FShoot;
-
-  FShoot.prototype.update = function(t){//time: update time in milliseconds
-
-    //fshoot life is unrelated to time but to travel distance
-    if(this.traveled > this.range){
-      this.terminate = true;//indicate the object should dissapear now. 
-      return;
-    }
-
-    let step = (t - this.lastTime) / 1000; //convert to seconds from milliseconds
-    this.lastTime = t;
-    let d = (this.speed * step);
-
-    //if(debug) console.log('fire update: this.traveled: ' + this.traveled + ' range: ' + this.range + ' step: ' + step);
-    //if(debug) console.log('fire update fID: ' + this.fID + ' x: ' + this.x + ' y: ' + this.y);
-
-    this.move(this.angle, d);
-    this.traveled += Math.round(d);//traveled is only used for termination so keep it integer. or not??
-  }
-
-  //only called on client. 
-  FShoot.prototype.draw = function(context, xView, yView, scale){
-    //only drawing a circle for now. should implement rendering optimization(pre render/ multi canvas) for complex objects
-    context.fillStyle = 'red';//TESTING
-    context.beginPath();
-    context.arc(this.x - xView, this.y - yView, 5, 0, 2*PI);
-    context.fill();
-    context.closePath();
-  }
-
-  Game.Fires.FShoot = FShoot;
 })();
