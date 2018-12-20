@@ -122,8 +122,9 @@
           down: false,
           left: false,
           right: false,
-          lClick: false,
-          rClick: false
+          lWeapon: false,
+          rWeapon: false,
+          skill: false
         };
 
         this.ws;
@@ -308,7 +309,7 @@
 
   game_core.prototype.compressPlayerConfig = function(playerConfig){
     let msg = 's/j/'; //player join message header
-
+    //optimize format
     msg += playerConfig.health + ';';
     msg += playerConfig.speed + ';';
     msg += playerConfig.vision + ';';
@@ -316,6 +317,7 @@
     msg += playerConfig.tID + ';';
     msg += playerConfig.lWeapon + ';';
     msg += playerConfig.rWeapon + ';';
+    msg += playerConfig.skill + ';';
     msg += playerConfig.color + ';';
     msg += playerConfig.name;
 
@@ -336,6 +338,7 @@
       vision: 1,
       lWeapon: clientConfig.lWeapon, //todo. make sure chosen weapon is not unavailable
       rWeapon: clientConfig.rWeapon,
+      skill: clientConfig.skill,
       color: clientConfig.color,
       name: clientConfig.name || 'A Poor Boy',
       viewW: clientConfig.viewW,
@@ -349,7 +352,7 @@
 
   game_core.prototype.client_addPlayer = function(playerConfig){
     //create new player based on config from client
-    const player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
+    const player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, Game.enums.WType[playerConfig.lWeapon], Game.enums.WType[playerConfig.rWeapon], Game.enums.WType[playerConfig.skill], playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
     player.state = Game.enums.PState.active;
     //if(debug && player.pID === undefined) {console.log(`add undefined pID: playerconfig: `); console.log(playerConfig);}
 
@@ -374,7 +377,7 @@
     });
 
     //create new player based on config from client
-    let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, this.createWeapon(playerConfig.lWeapon), this.createWeapon(playerConfig.rWeapon), playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
+    let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, Game.enums.WType[playerConfig.lWeapon], Game.enums.WType[playerConfig.rWeapon], Game.enums.WType[playerConfig.skill], playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
     player.playerConfig = playerConfig;
     player.setBounds(0, 0, this.map.width, this.map.height);
     //have camera on server side for determining what player can see
@@ -465,21 +468,10 @@
        * WShoot: cool, dmg, range, speed, length, spriteCount, name
        * 
        *  */
-      
-      case 'dagger': 
-        weapon =  new Game.Weapons.WClose(300, 8, 47, 200, 3, name);
-        if(!this.server){weapon.addGraphic(Game.sprites[name], 0.2, 0, 0);}
-        break;
       case 'katana':
         weapon = new Game.Weapons.WClose(1000, 99, 62, 600, 8, name);
         if(!this.server){weapon.addGraphic(Game.sprites[name], 0.8, 0.5, 0.5);}
-        break;
-      case 'fist':
-        weapon = new Game.Weapons.WShoot(200, 4, 500, 400, 20, 1, name);
-        if(!this.server){weapon.addGraphic(undefined);}//fist is invisible
-        break;
-      //todo. more weapons
-    }
+        break;}
 
     return weapon;
     
@@ -602,23 +594,45 @@
     if(ic) {
       for(var j = 0; j < ic; ++j) {
         //if(debug) console.log('process input: pID: ' + player.pID + ' input time: ' + player.inputs[j].time + ' seq: ' + player.inputs[j].seq + ' last seq: ' + player.last_input_seq);
+        const input = player.inputs[j];
 
           //don't process ones we already have simulated locally
-        if(player.inputs[j].seq <= player.last_input_seq) continue;
+        if(input.seq <= player.last_input_seq) continue;
         
-        let time = player.inputs[j].time;
-        let step = time - player.last_input_time || 0.016; //0.016 is the ideal timestep in seconds
+        const time = input.time;
+        const step = time - player.last_input_time || 0.016; //0.016 is the ideal timestep in seconds
 
-        player.handleControls(player.inputs[j].inputs, step); 
+        player.handleControls(input.inputs, step); 
         player.last_input_time = time;
-        player.last_input_seq = player.inputs[j].seq;
+        player.last_input_seq = input.seq;
+
+        //core handle fires
+        if(input.inputs.lWeapon == true && player.lWeapon.ready()){player.lWeapon.fire(this, input.inputs.mouseX, input.inputs.mouseY);}
+        if(input.inputs.rWeapon == true && player.rWeapon.ready()){player.rWeapon.fire(this, input.inputs.mouseX, input.inputs.mouseY);}
+        if(input.inputs.skill == true && player.skill.ready()){player.skill.fire(this, input.inputs.mouseX, input.inputs.mouseY);}
+    
         
         
       } //for each input command
     } 
   
   }; //game_core.process_input
-  
+  game_core.prototype.server_handleFire = function(tool, x, y, angle, mx, my){
+
+    //if it's something that add stuff onto the map
+    if(tool.wType !== undefined){
+      const fire = tool.fire(x, y, angle, mx, my);
+      this.server_addFire(fire);
+      return;
+    }
+    //else it can be anything. pass in game core to let skill decide
+    else{
+      if(debug) console.assert(tool.sType !== undefined);
+      tool.fire(this, x, y, angle, mx, my);
+      return;
+    }
+  }
+
   game_core.prototype.parseClientInput = function( msg ) {
     if(debug) console.assert(typeof msg === 'string');
 
@@ -631,8 +645,9 @@
     controls.down = parseInt(parts[3], 10);
     controls.left = parseInt(parts[4], 10);
     controls.right = parseInt(parts[5], 10);
-    controls.lClick = parseInt(parts[6], 10);
-    controls.rClick = parseInt(parts[7], 10);
+    controls.lWeapon = parseInt(parts[6], 10);
+    controls.rWeapon = parseInt(parts[7], 10);
+    controls.skill = parseInt(parts[8], 10);
     
     return controls;
   }
@@ -984,7 +999,7 @@
     
     let t = Date.now();//get current timestamp for time dependent physics update
 
-    //handle fires(objects that hurt/move(projectiles etc))
+    //handle fires
     this.fires.forEach((fire) => {
       //git rid of the 'dead' objects. -1 is the life code for self termination
       if(fire.terminate) {
@@ -996,11 +1011,12 @@
       fire.update(t);
       //if(debug) console.log('fire updated: left: ' + fire.left);
 
+      /*//not necessary to actively check. optimize. actually check with profiler to see which way is better
       //remove if out of map
       if(!this.map.checkWorldBoundary(fire)){
         this.server_removeFire(fire);
         return;
-      }
+      }*/
 
       this.map.updateObject(fire);
       this.map.handleCollides(fire);
@@ -1009,7 +1025,6 @@
     //handle players
     this.players.forEach((player) => {
 
-      //?? is checking for alive or not each time too inefficient?
       if(player.state === Game.enums.PState.active){
         //?? should process input be handled by player? where exactly to call map updateobject?
         this.process_input(player);  
@@ -1056,27 +1071,17 @@
       visibles.players.forEach((oth) => {
         if(debug) console.assert(oth.state === Game.enums.PState.active);
         
-        update += oth.x + ',' + oth.y + ',' + oth.angle + ',' + oth.pID + ',' + oth.lWeapon.spriteIndex + ',' + oth.rWeapon.spriteIndex + ',' + oth.health + ';';
+        update += oth.x + ',' + oth.y + ',' + oth.angle.fixed(3) + ',' + oth.pID + ',' + oth.lWeapon.spriteIndex + ',' + oth.rWeapon.spriteIndex + ',' + oth.skill.spriteIndex + ',' + oth.health + ';';
       });
 
       update += ':';
       
       //add newly visible fires' construction params.
       visibles.newFires.forEach((fire) => {
-        //optimize. right now sending a brand new fire constructor parameter set. client should only need a few for graphics
-        switch(fire.wType){//diferent fire types need different params. update needs wtype in fron so client can identify
-          case(Game.enums.WType.dagger):
-            update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.life  + ',' + fire.left + ',' + fire.holdRadius + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.passable + ';';
-            break;
-          case(Game.enums.WType.katana):
-            update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.life  + ',' + fire.left + ',' + fire.holdRadius + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.passable + ';'; 
-            break;
-          case(Game.enums.WType.fist):
-            update += fire.wType + ',' + fire.fID + ',' + fire.dmg + ',' + fire.x + ',' + fire.y + ',' + fire.range  + ',' + fire.angle + ',' + fire.speed  + ',' + fire.pID + ',' + fire.shape + ',' + fire.hitOnce + ',' + fire.hurtOnce + ',' + fire.traveled + ';';
-            break;
-          default:
-            console.log('::ERROR:: server update: fire update: no matching WType');
-        }
+        
+        update += fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.traveled + ',' + fire.left + ',' + fire.holdRadius + ';';
+        //if(debug) console.log(`server update newFire: ${fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.traveled + ',' + fire.left + ';'}`);
+        
       });
 
       update += ':';
@@ -1097,6 +1102,8 @@
 
       //if(debug) console.log('server update sent: ' + update);
       player.instance.send(update);
+
+      //if(debug) console.log(`server update: ${update}`);
     });
     //refresh objects to remove list
     this.updatedObjects = [];
@@ -1185,8 +1192,9 @@
       down: this.controls.down,
       left: this.controls.left,
       right: this.controls.right,
-      lClick: this.controls.lClick,
-      rClick: this.controls.rClick
+      lWeapon: this.controls.lWeapon,
+      rWeapon: this.controls.rWeapon,
+      skill: this.controls.skill
     };
   
     this.input_seq += 1;
@@ -1200,7 +1208,7 @@
 
       //Send the packet of information to the server.
       //The input packets are labelled with an 'i' in front.
-      //example packet: "i/34,500,001010(up down left right lclick rclick);169.232(local_time);7(seq)""
+      //example packet: "i/34,500,001010(up down left right lWeapon rWeapon);169.232(local_time);7(seq)""
     var server_packet = 'i/';
       server_packet += input.mouseX; //relative to world not canvas
       server_packet += ',' + input.mouseY;
@@ -1208,8 +1216,9 @@
       server_packet += ',' + (input.down ? 1 : 0);
       server_packet += ',' + (input.left ? 1 : 0);
       server_packet += ',' + (input.right ? 1 : 0);
-      server_packet += ',' + (input.lClick ? 1 : 0);
-      server_packet += ',' + (input.rClick ? 1 : 0);
+      server_packet += ',' + (input.lWeapon ? 1 : 0);
+      server_packet += ',' + (input.rWeapon ? 1 : 0);
+      server_packet += ',' + (input.skill ? 1 : 0);
       server_packet += ';' + this.local_time.toFixed(3);
       server_packet += ';' + this.input_seq;
 
@@ -1447,11 +1456,12 @@
     update.pID = parseInt(commands[3], 10);
 
     //spriteIndex of player's two weapons for animation
-    update.lspriteIndex = parseInt(commands[4], 10);
-    update.rspriteIndex = parseInt(commands[5], 10);
+    update.lWeaponSpriteIndex = parseInt(commands[4], 10);
+    update.rWeaponSpriteIndex = parseInt(commands[5], 10);
+    update.skillSpriteIndex = parseInt(commands[6], 10);
 
     //stats. todo. this should be on a separate slower update loop
-    update.health = parseInt(commands[6], 10);
+    update.health = parseInt(commands[7], 10);
   
     //if(debug) console.log('client ParsePlayerUpdate: pID: ' + update.pID + ' angle: ' + update.angle);
 
@@ -1470,45 +1480,14 @@
     update.wType = parseInt(commands[0], 10);//first identify fire type
     //common params
     update.fID = parseInt(commands[1], 10);
-    update.dmg = parseInt(commands[2], 10);
-    update.x = parseInt(commands[3], 10);
-    update.y = parseInt(commands[4], 10);
-    update.range = parseInt(commands[5], 10);
-    update.angle= parseFloat(commands[6]);
+    update.x = parseInt(commands[2], 10);
+    update.y = parseInt(commands[3], 10);
+    update.angle= parseFloat(commands[4]);
+    update.player = this.players.get(parseInt(commands[5], 10));
+    update.traveled = (commands[6] === 'undefined') ? undefined : parseInt(commands[6], 10);
+    update.left = (commands[7] === 'undefined') ? undefined : commands[7] === 'true';
+    update.holdRadius = (commands[8] === 'undefined') ? undefined : parseInt(commands[8], 10);
 
-    switch(update.wType){
-      case(Game.enums.WType.dagger):
-        update.life = parseInt(commands[7], 10);
-        update.left = (commands[8] === 'true');
-        update.holdRadius = parseInt(commands[9], 10);
-        update.pID = parseInt(commands[10], 10);
-        update.player = this.players.get(update.pID);
-        update.shape = parseInt(commands[11], 10);
-        update.hitOnce = (commands[12] === 'true');
-        update.hurtOnce = (commands[13] === 'true');
-        update.passable = (commands[14] === 'true');
-        break;
-      case(Game.enums.WType.katana):
-        update.life = parseInt(commands[7], 10);
-        update.left = (commands[8] === 'true');
-        update.holdRadius = parseInt(commands[9], 10);
-        update.pID = parseInt(commands[10], 10);
-        update.player = this.players.get(update.pID);
-        update.shape = parseInt(commands[11], 10);
-        update.hitOnce = (commands[12] === 'true');
-        update.hurtOnce = (commands[13] === 'true');
-        update.passable = (commands[14] === 'true');
-        break;
-      case(Game.enums.WType.fist):
-        update.speed = parseInt(commands[7], 10);
-        update.pID = parseInt(commands[8], 10);
-        update.player = this.players.get(update.pID);
-        update.shape = parseInt(commands[9], 10);
-        update.hitOnce = (commands[10] === 'true');
-        update.hurtOnce =(commands[11] === 'true');
-        update.traveled = parseInt(commands[12], 10);
-        break;
-    }
     if(debug) console.assert(update.player);
     //if(debug) {console.log('fire update obj: '); console.log(update);}
 
@@ -1532,32 +1511,20 @@
     return update;
   }
   //create a fire based on parsed server update object
-  game_core.prototype.client_createFire = function(instance){
+  game_core.prototype.client_addFire = function(instance){
     let fire;
 
-    switch(instance.wType){
-      case(Game.enums.WType.dagger):
-        fire = new Game.Fires.FClose(instance.dmg, instance.x, instance.y, instance.range, instance.angle, instance.life, instance.left, instance.holdRadius, instance.player, instance.wType, instance.shape, instance.hitOnce, instance.hurtOnce, instance.passable);
-        break;
-      case(Game.enums.WType.katana):
-        fire = new Game.Fires.FClose(instance.dmg, instance.x, instance.y, instance.range, instance.angle, instance.life, instance.left, instance.holdRadius, instance.player, instance.wType, instance.shape, instance.hitOnce, instance.hurtOnce, instance.passable);
-        break;
-      case(Game.enums.WType.fist):
-        fire = new Game.Fires.FShoot(instance.dmg, instance.x, instance.y, instance.range, instance.angle, instance.speed, instance.player, instance.wType, instance.shape, instance.traveled, instance.hitOnce, instance.hurtOnce);
-        break;
-      default:
-        console.error('::ERROR:: client_createFire: no matching wType: wtype: ' + instance.wType);
-    
-    }
+    fire = new Game.Fire(instance.x, instance.y, instance.angle, instance.player, instance.wType, instance.traveled, instance.left, instance.holdRadius);
 
     fire.fID = instance.fID;
 
+    //if(debug) console.log(instance);
     //if(debug) {console.log('client createFire: fire: '); console.log(fire);}
 
-    return fire;
+    this.fires.set(fire.fID, fire);
   }
 
-  game_core.prototype.client_onserverupdate_received= function(data){
+  game_core.prototype.client_onserverupdate_received = function(data){
       //update everything graphics related together here before prediction to prevent jitter. todo. move updates to physics_update(or somewhere else ?? ) once have prediction 
         
       //if connection is not ready don't do anything
@@ -1629,11 +1596,9 @@
         for(let i = 0, l = update.fires.length; i < l; i++){
           let instance = update.fires[i];
           //for now only have bullets
-          let fire = this.client_createFire(instance);
+          this.client_addFire(instance);
 
           //if(debug) console.log('new fire: fID: ' + fire.fID);
-
-          this.fires.set(fire.fID, fire);//fid as index
         }
 
         //remove fires with their fid
@@ -1780,7 +1745,7 @@
     //draw stats
     this.drawStats(ctx, width, height);
     
-    //todo. not predicting for now
+    //todo. not predicting for nfow
       //When we are doing client side prediction, we smooth out our position
       //across frames using local input states we have stored.
     //this.client_update_local_position(); 
@@ -1797,23 +1762,27 @@
      * todotodo.
      * 
      * 
+     * 
+     * revamp firing process: skills and weapons are one, share same enum. 
+     *  
+     * let holdradius replace left? not necessary right now 
+     * draw graphics based on level. replace glist with graphic levels, distinguish not by zone or fire etc
+     * 
      */
     /**
      * ??
-     * How to make sure obstacle hierarchy? (tree crown over others)
+     * Instead of skill and weapons' spriteindex, just pass all the sprite indexes about player? (to cover special effect etc)
+     *  or add special graphic ids about player ITSELF in addition to tool's indexes.
+     * Player randomly flashed to close to upper edge after destroying a box ?! or did i hallucinate
      * Best way to identify obstacles for different graphics?
-     * Should clients process zones to determine graphics or all on server?
      * Cleaner way to mark this for visibility identification? 
      *  if two hidings overlap(artificial smoke etc) then how does this work? 
      *  each ztype only get one zID slot;
      * Why do fires rate(bullets) tend to synchronize over time
-     * For updatestats, more efficient to let whoever(obstacle or player etc) need stats update put their id in a array and go through that?
-     * Draw game canvas on itself in response to moving and then draw the new section to optimize?
      * Should obstacles to draw also be dictated by servers? that would cost bandwidth, 
-     *  but would it increase client performance since on need to iterate graphic grid?
-     * Is it a better idea to split each cellg into lists by obj type or just iterate through all and draw right ones? 
-     *  also since fires and entites to draw are dictated by servers should they just not be in graphic grid on client side?
-     * Does index affect performance? how to utilize typed arrays?
+     *  but would it increase client performance since no need to iterate graphic grid?
+     * Since fires and entites to draw are dictated by servers should they just not be in graphic grid on client side?
+     * Does big index affect performance? how to utilize typed arrays?
      * 
      */
     
@@ -2090,8 +2059,9 @@
     playerConfig.tID = parseInt(update[4], 10);
     playerConfig.lWeapon = update[5];
     playerConfig.rWeapon = update[6];
-    playerConfig.color = update[7];
-    playerConfig.name = update[8];
+    playerConfig.skill = update[7];
+    playerConfig.color = update[8];
+    playerConfig.name = update[9];
 
     return playerConfig;
   }

@@ -5,7 +5,8 @@
   "version": "1.0.0",
   "dependencies": {
     "express": ">=3.11.0",
-    "uws": "9.148.x",
+    "uws": "0.14.x",
+    "ws": "6.1.x",
     "mersenne-twister":"1.1.x",
     "url": "0.11.x",
     "v8-profiler": "5.7.x"

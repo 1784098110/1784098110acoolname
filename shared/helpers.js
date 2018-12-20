@@ -53,7 +53,7 @@ window.helpers = {};
   }
 
   helpers.lineCollideRec = function(x11, y11, x12, y12, x2, y2, h, w){//d is length of line, angle is line's angle. x12 and y12 or angle and d can be passed in as undefined, but not both
-
+  //does not work if line is inside rec completely
     if(debug) console.assert(x12 !== undefined && w !== undefined);
 
     //rec's four corners
@@ -62,9 +62,9 @@ window.helpers = {};
     let x21 = x2 - w2;
     let y21 = y2 - h2;
     let x22 = x2 + w2;
-    let y22 = y2 + h2;
+    let y22 = y2 - h2;
     let x23 = x2 + w2;
-    let y23 = y2 - h2;
+    let y23 = y2 + h2;
     let x24 = x2 - w2;
     let y24 = y2 + h2;
     //check line intersection with all four sides(rec is not at an angle)
@@ -81,11 +81,13 @@ window.helpers = {};
     s1_y = y12 - y11;
     s2_x = x22 - x21;
     s2_y = y22 - y21;
-  
+
     var s, t;
     s = (-s1_y * (x11 - x21) + s1_x * (y11 - y21)) / (-s2_x * s1_y + s1_x * s2_y);
     t = ( s2_x * (y11 - y21) - s2_y * (x11 - x21)) / (-s2_x * s1_y + s1_x * s2_y);
   
+    //if(debug) console.log(`lineCollideLine: x11: ${x11} y11: ${y11} x12: ${x12} y12: ${y12} x21: ${x21} y21: ${y21} x22: ${x22} y22: ${y22} s: ${s} t: ${t}`);
+
     return (s >= 0 && s <= 1 && t >= 0 && t <= 1);
   }
 

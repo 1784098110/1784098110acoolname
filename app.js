@@ -1,6 +1,6 @@
 const 
   port = 3000,
-  Websocket = require('uws'),
+  Websocket = require('ws'),
   express = require('express'),
   url = require('url'),
 

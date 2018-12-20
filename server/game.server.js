@@ -11,7 +11,7 @@
     //Import shared game library code.
   require('../shared/game.core.js');
   require('../shared/types.js');
-  require('../shared/weapons.js');
+  require('../shared/tools.js');
   require('../shared/fires.js');
   require('../shared/landscape.js');
   require('../shared/helpers.js');

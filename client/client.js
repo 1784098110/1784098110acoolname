@@ -43,6 +43,7 @@ function handleConfigs(e){
 		color: config.elements['color'].value,
 		lWeapon: config.elements['lWeapon'].value,
 		rWeapon: config.elements['rWeapon'].value,
+		skill: config.elements['skill'].value,
 		viewW: window.innerWidth,//repeating. optimize. or should each client has a fixed view size regardless of actual window size?
 		viewH: window.innerHeight
 	};
@@ -92,7 +93,7 @@ function fetchSprites() {
 	for(let i = 0, l = sprites.length; i<l; i++){
 		let imageName = sprites[i];
 
-		Game.sprites[imageName] =  document.createElement('img');
+		Game.sprites[Game.enums.WType[imageName]] =  document.createElement('img');
 
 		// construct the URL path to the image file from the product.image property
 		let url = 'sprites/' + imageName + '.png';
@@ -105,7 +106,7 @@ function fetchSprites() {
 			// that points to an object stored inside the browser
 			let objectURL = URL.createObjectURL(blob);
 			
-			Game.sprites[imageName].src = objectURL;
+			Game.sprites[Game.enums.WType[imageName]].src = objectURL;
 			});
 		} else {
 			console.log('Network request for "' + product.name + '" image failed with response ' + response.status + ': ' + response.statusText);
@@ -191,6 +192,8 @@ window.onload = function(){
 			case 83: // S
 				game.controls.down = true;
 				break;
+			case 32: //space
+				game.controls.skill = true;
 		}
 	}, false);
 	window.addEventListener("keyup", function (e) {
@@ -210,6 +213,8 @@ window.onload = function(){
 			case 77: // M
 				game.showMap = !game.showMap;
 				break;
+			case 32: //space
+				game.controls.skill = false;
 			case 27: //Esc
 				break;
 		}
@@ -222,8 +227,8 @@ window.onload = function(){
 		e.preventDefault();
 		e.stopPropagation();
 
-		if(e.button === 0)game.controls.lClick = true;
-		else if(e.button === 2)game.controls.rClick = true;
+		if(e.button === 0)game.controls.lWeapon = true;
+		else if(e.button === 2)game.controls.rWeapon = true;
 	}, false);
 	gameDiv.addEventListener("mouseup", function (e) {
 		e.preventDefault();
@@ -231,8 +236,8 @@ window.onload = function(){
 		
 		//if(debug) console.log(`mouse pos to map: x: ${game.camera.xView + game.controls.mouseX} y: ${game.camera.yView + game.controls.mouseY} self x: ${game.self.x} y: ${game.self.y} `)
 
-		if(e.button === 0)game.controls.lClick = false;
-		else if(e.button === 2)game.controls.rClick = false;	
+		if(e.button === 0)game.controls.lWeapon = false;
+		else if(e.button === 2)game.controls.rWeapon = false;	
 	}, false);
 
 	//menu buttons

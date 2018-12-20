@@ -46,6 +46,7 @@
                     
                     Left-Hand Weapon:<br>
                     <select name = 'lWeapon'>
+                        <!-- todo. let values be wtype and stype numbers-->
                         <option value='fist'>Fist</option>
                         <option value='dagger'>Dagger</option>
                         <option value='katana'>katana</option>
@@ -63,6 +64,16 @@
                         <option value='launcher'>Launcher</option>
                         <option value='jellyBelly'>Jelly Belly</option>
                     </select>
+                    <br>
+                    Ability:<br>
+                    <select name = 'skill'>
+                        <option value='heal'>Heal</option>
+                        <option value='flash'>Flash</option>
+                        <option value='immune'>Invulnerable</option>
+                        <option value='fireball'>Fireball</option>
+                        <option value='stealth'>Stealth</option>
+                        <option value='teleport'>Teleport</option>
+                    </select>
                     <br><br>
                     <input class = 'homeButtons' type="submit" value="Play">
                 </form> 
@@ -79,7 +90,7 @@
     
     <script src = "mersenneTwister.js"></script>
     <script src = "../shared/types.js"></script>
-    <script src = "../shared/weapons.js"></script>
+    <script src = "../shared/tools.js"></script>
     <script src = "../shared/fires.js"></script>
     <script src = "../shared/landscape.js"></script>
     <script src = "../shared/game.core.js"></script>

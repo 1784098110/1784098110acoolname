@@ -31,7 +31,7 @@ Game.enums = {
   Shape: Object.freeze({'custom': 0, 'rectangle':1, 'circle':2, 'line':3, 'point':4}),
   PState: Object.freeze({'dead':0, 'active':1, 'spectate':2, 'protect':3}),
   TClass: Object.freeze({'none': 0, 'close':1, 'shoot':2, 'mute':3}),
-  WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6}),
+  WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'flash': 8, 'heal': 9, 'immune': 10, 'stealth': 11}),
   GOver: Object.freeze({'death': 0, 'teamWin': 1, 'teamLose': 2, 'playerWin': 3, 'playerLost':4}),
   OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 3, 'bush': 4, 'box': 5}),
   OPType: Object.freeze({'treeTrunk': 0, 'treeCrown': 1, 'rock': 2, 'house11': 3, 'house12': 4, 'house13': 5, 'bush': 6, 'box': 7}),
@@ -56,11 +56,13 @@ Game.enums = {
     this.passable = (passable === undefined) ? false : passable; 
 
     //undestructible objects have health and shield undefined
-    this.health = (shield === undefined) ? undefined : health; 
-    this.maxHealth = health;//health is by default based on size and set by shapes
-    this.shield = shield;
-    this.dmgs = []; //damage received to be processed each iteration
-
+    if(health !== undefined){
+      this.health = (shield === undefined) ? undefined : health; 
+      this.maxHealth = health;//health is by default based on size and set by shapes
+      this.shield = shield;
+      this.dmgs = []; //damage received to be processed each iteration
+    }
+    
     //object specific boundary if applicable.
     this.xMin;
     this.xMax;
@@ -125,15 +127,15 @@ Game.enums = {
   }
   Gobject.prototype.faceDirection = function(x, y){
     //?? optimize?
-    let angle = (Math.atan2(y - this.y, x - this.x)).fixed();//?? is this causing waving and rounded fire angle?
+    let angle = (Math.atan2(y - this.y, x - this.x));//?? is this causing waving and rounded fire angle?
     this.angle = angle;
   }
   Gobject.prototype.setBounds = function(xMin, yMin, xMax, yMax){
     //set movement limit on map
-    this.xMin = 0;
-    this.xMax = this.game.map.width;
-    this.yMin = 0;
-    this.yMax = this.game.map.height;
+    this.xMin = xMin;
+    this.xMax = xMax;
+    this.yMin = yMin;
+    this.yMax = yMax;
   }
   //update stats like health based on dmgs received
   Gobject.prototype.updateStats = function(){
@@ -641,18 +643,19 @@ Game.enums = {
 
 //Entity
 (function(){
-  function Entity(tID, lWeapon, rWeapon, shield){
+  function Entity(tID, lWeapon, rWeapon, skill, shield){
     Game.Circle.call(this, 25, 0, 0, 0, false, shield);
 
     this.tID = tID;
     this.gList = Game.enums.GList.entity;
 
-    if(debug) console.assert(lWeapon && rWeapon);
-    this.lWeapon = lWeapon;
+    //weapons and skill are type enums 
+    this.lWeapon = new Game.Tool(lWeapon);
     this.lWeapon.equip(this, true);
-
-    this.rWeapon = rWeapon;
+    this.rWeapon = new Game.Tool(rWeapon);
     this.rWeapon.equip(this, false);
+    this.skill = new Game.Tool(skill);
+    this.skill.equip(this, undefined);
 
   }
 
@@ -692,8 +695,10 @@ Game.enums = {
 
   //?? awkward method. where should animation be updated?
   Entity.prototype.updateGraphics = function(){
+    //if(debug) console.log(`entity updategraphics`);
     this.lWeapon.updateGraphics();
     this.rWeapon.updateGraphics();
+    this.skill.updateGraphics();
   }   
 
   Game.Entity = Entity;
@@ -701,8 +706,8 @@ Game.enums = {
 
 //Character
 (function(){
-  function Character(health, speed, vision, tID, lWeapon, rWeapon, color, name){
-    Game.Entity.call(this, tID, lWeapon, rWeapon, 0);
+  function Character(health, speed, vision, tID, lWeapon, rWeapon, skill, color, name){
+    Game.Entity.call(this, tID, lWeapon, rWeapon, skill, 0);
     //combat stats
     this.health = health;
     this.maxHealth = this.health;
@@ -814,8 +819,8 @@ Game.enums = {
 
 //Player
 (function(){
-  function Player(health, speed, vision, pID, tID, lWeapon, rWeapon, color, name, viewW, viewH, game){
-    Game.Character.call(this, health, speed, vision, tID, lWeapon, rWeapon, color, name);
+  function Player(health, speed, vision, pID, tID, lWeapon, rWeapon, skill, color, name, viewW, viewH, game){
+    Game.Character.call(this, health, speed, vision, tID, lWeapon, rWeapon, skill, color, name);
     this.pID = pID;
 
     this.instance; //websocket instance. todo. should it be initialized on construction? 
@@ -830,7 +835,7 @@ Game.enums = {
     this.viewH = viewH;
 
     //keep reference of the game player's in
-    this.game = game;
+    //this.game = game; todo. not needed?
     this.camera;//externally assigned. server only. to know what player sees
 
     //only used on server side; for determining what a client can see
@@ -920,8 +925,6 @@ Game.enums = {
     //if(debug && (~~dx || ~~dy)) console.log('player handlecontrols: controls: ~~dx: ' + (~~dx) + ' ~~dy: ' + (~~dy) + ' x: ' + this.x + ' y: ' + this.y);
 
     //if(debug) console.log('player handlecontrols: lClick: ' + controls.lClick + ' rClick: ' + controls.rClick);
-    if(controls.lClick == true && this.lWeapon.ready()){this.game.server_addFire(this.lWeapon.fire(this.x, this.y, this.angle, controls.mouseX, controls.mouseY));}//todo. some fire constructions don't need mouse coor. but no harm in passing
-    if(controls.rClick == true && this.rWeapon.ready()){this.game.server_addFire(this.rWeapon.fire(this.x, this.y, this.angle, controls.mouseX, controls.mouseY));}
     
   }
 
@@ -936,8 +939,9 @@ Game.enums = {
     
     this.angle = update.angle;
 
-    this.lWeapon.spriteIndex = update.lspriteIndex;
-    this.rWeapon.spriteIndex = update.rspriteIndex;
+    this.lWeapon.spriteIndex = update.lWeaponSpriteIndex;
+    this.rWeapon.spriteIndex = update.rWeaponSpriteIndex;
+    this.skill.spriteIndex = update.skillSpriteIndex;
 
     this.health = update.health;
   }
@@ -948,24 +952,7 @@ Game.enums = {
   Game.Player = Player;
 })();
 
-//Tool
-(function(){
-  //cooltime is in milliseconds
-  function Tool(cool){
-    this.cool = cool;
-    this.lastFire = 0;
 
-    this.tID;
-    this.player;
-  }
-
-  Tool.prototype.equip = function(player, left){
-    this.player = player;
-    this.tID = player.tID; 
-  }
-
-  Game.Tool = Tool;
-})();
 
 //Camera
 (function () {

@@ -1,62 +1,90 @@
-
-//Fire todo.if daggerfire moves as a projectile then it's moving independently of player. pass in player to account for its possition?
 (function(){
-  function Fire(dmg, x, y, range, angle, player, wType, shape, hitOnce, hurtOnce, passable){
+  //fire constructor assigns fire details based on wtype
+  function Fire(x, y, angle, player, wType, traveled, left, holdRadius){
     
     if(debug) console.assert(player.pID !== undefined);
-
-    Game.Gobject.call(this, x, y, shape, angle, passable || true, undefined, undefined);
+    Game.Gobject.call(this, x, y, undefined, angle, undefined, undefined, undefined);
 
     this.wType = wType;
     this.gList = Game.enums.GList.fire;
 
-    this.dmg = dmg;
-    //for stopping when range limit's reached
-    this.range = range;
-    this.angle = angle;
+    /*might or might not have based on type
+    this.dmg;
+    this.range;//for stopping when range limit's reached
+    this.speed;
+    this.traveled;
+    this.life;
+    */
+    //assigned based on type
+    this.shape;
+    this.hitOnce;//if fire disapears after one hit
+    this.hurtOnce;//if fire only causes one time damage
 
     this.fID;//fire id to be assigned by game core after construction. ?? needed on client side for removal? got to be a more elegant way to inform clients of fire removal
     this.player = player;
     this.pID = this.player.pID;//to know who killed who
     this.tID = this.player.tID;
+    this.upperGround = this.player.upperGround;
     this.viewers = [];//server only. store players who sees the fire for fast removal
     this.hit = [];//pIDs of hit objects for hitonce checking. todo. need more than pIDs.
-
-    this.hitOnce = (hitOnce === undefined) ? true : hitOnce;//if fire disapears after one hit
-    this.hurtOnce = (hurtOnce === undefined) ? true : hurtOnce;//if fire only causes one time damage
 
     this.terminate = false; //0 means unrelated to time, -1 means to be removed, other positive numbers mean life time in millisecs
     this.lastTime = Date.now();
 
     //array that belongs to core that stores ids of objects who need to update stats
-    this.toUpdateStatsObjects;//server only
+    this.toUpdateStatsObjects;//server only, externally assigned
 
-    //todo. too inelegant way to give fire a shape. how???
-    //give fire necessary attributes based on passed in shape since it can't just inherit the shape due to its dynamic shape
-    switch(shape){
-      case(Game.enums.Shape.circle):
-        this.radius = this.range;
-        break;
-      case(Game.enums.Shape.rectangle):
-        this.width = range;//todo. rec shape needs special passed in specs
-        this.height = range;
-        break;
-      case(Game.enums.Shape.line):
-        this.length = this.range;
+    //decide fire details based on WType
+    //todo. add sprite
+    switch(wType){
+      case(Game.enums.WType.fist):
+      this.dmg = 4;
+      this.range = 500;
+      this.speed = 400;
+      this.shape = Game.enums.Shape.point;
+      this.radius = 5;
+      this.traveled = traveled || 0;
+      this.hitOnce = true;
+      this.hurtOnce = true;
+      this.color = 'red';//testing. should have sprite for bullets
+      this.update = this.shootUpdate;
+      break;
 
-        //store the other end of line for easy collision
-        this.x2 = this.x + Math.cos(this.angle) * this.length;
-        this.y2 = this.y + Math.sin(this.angle) * this.length;
+      case(Game.enums.WType.dagger):
+      this.dmg = 8;
+      this.range = 47;
+      this.life = 200;
+      this.shape = Game.enums.Shape.line;
+      this.length = this.range;
+      this.x2 = this.x + Math.cos(this.angle) * this.length;
+      this.y2 = this.y + Math.sin(this.angle) * this.length;
+      this.left = left;
+      this.holdRadius = holdRadius;
+      this.hitOnce = false;
+      this.hurtOnce = true;
+      this.color = undefined;//testing. because there's a default color for object and color is used to determine draw
+      this.update = this.closeUpdate;
+      break;
 
-        //if(debug) console.log('fire line constructor: angle: ' + this.angle + ' x: ' + this.x + ' y: ' + this.y + ' x2: ' + this.x2 + ' y2: ' + this.y2);
+      case(Game.enums.WType.katana):
+      this.dmg = 30;
+      this.range = 62;
+      this.life = 500;
+      this.shape = Game.enums.Shape.circle;
+      this.radius = this.range;
+      this.x2 = this.x + Math.cos(this.angle) * this.length;
+      this.y2 = this.y + Math.sin(this.angle) * this.length;
+      this.left = left;
+      this.holdRadius = holdRadius;
+      this.hitOnce = false;
+      this.hurtOnce = true;
+      this.color = undefined;//testing
+      this.update = this.closeUpdate;
+      break;
 
-        break;
-      case(Game.enums.Shape.point):
-        this.radius = 10;
-        this.point = true;
-        break;
       default:
-        console.log(' ::ERROR:: Fire Constructor: No matching Shape');
+      if(debug) console.log(` ::ERROR:: fire construct no matching wType: ${wType}`);
+
     }
   }
 
@@ -182,25 +210,25 @@
     //if(debug) console.log(' other dmgs: ' + other.dmgs);
   }
 
-  Game.Fire = Fire
-})();
+  Fire.prototype.shootUpdate = function(t){//time: update time in milliseconds
 
-(function(){
-  function FClose(dmg, x, y, range, angle, life, left, holdRadius, player, wType, shape, hitOnce, hurtOnce, passable){
-    Game.Fire.call(this, dmg, x, y, range, angle, player, wType, shape, hitOnce || false, hurtOnce, passable);
+    //fshoot life is unrelated to time but to travel distance
+    if(this.traveled > this.range){
+      this.terminate = true;//indicate the object should dissapear now. 
+      return;
+    }
 
-    //if(debug) console.log('fclose constructor');
+    let step = (t - this.lastTime) / 1000; //convert to seconds from milliseconds
+    this.lastTime = t;
+    let d = (this.speed * step);
 
-    this.life = life;
-    this.left = left;
-    this.holdRadius = holdRadius;
+    //if(debug) console.log('fire update: this.traveled: ' + this.traveled + ' range: ' + this.range + ' step: ' + step);
+    //if(debug) console.log('fire update fID: ' + this.fID + ' x: ' + this.x + ' y: ' + this.y);
 
-  }
-
-  FClose.prototype = Object.create(Game.Fire.prototype);
-  FClose.prototype.constructor = FClose;
-
-  FClose.prototype.update = function(t){//time: update time in milliseconds
+    this.move(this.angle, d);
+    this.traveled += Math.round(d);//traveled is only used for termination so keep it integer. or not??
+  }  
+  Fire.prototype.closeUpdate = function(t){//time: update time in milliseconds
     //if(debug) console.log('FClose update');
     //fclose's termination is related to time
     if(t - this.lastTime > this.life){
@@ -220,10 +248,39 @@
       this.x2 = Math.round(this.x + Math.cos(this.angle) * this.length);
       this.y2 = Math.round(this.y + Math.sin(this.angle) * this.length);
     }
+    //if(debug) console.log('fire update fID: ' + this.fID + ' x: ' + this.x + ' y: ' + this.y + ' range: ' + this.range + ' angle: ' + this.angle + ' dmg: ' + this.dmg);
+  }
 
-    //if(debug) console.log('fire update fID: ' + this.fID + ' x: ' + this.x + ' y: ' + this.y + ' range: ' + this.range + ' angle: ' + this.angle);
+  //only called on client. 
+  Fire.prototype.draw = function(context, xView, yView, scale){
+    if(!this.color) return;//if fire has not graphics
+
+    context.fillStyle = this.color;//TESTING
+    context.beginPath();
+    context.arc(this.x - xView, this.y - yView, this.radius, 0, 2*PI);
+    context.fill();
+    context.closePath();
+  }
+
+  Game.Fire = Fire
+})();
+
+(function(){
+  function FClose(dmg, x, y, range, angle, life, left, holdRadius, player, wType, shape, hitOnce, hurtOnce, passable){
+    Game.Fire.call(this, dmg, x, y, range, angle, player, wType, shape, hitOnce || false, hurtOnce, passable);
+
+    //if(debug) console.log('fclose constructor');
+
+    this.life = life;
+    this.left = left;
+    this.holdRadius = holdRadius;
 
   }
+
+  FClose.prototype = Object.create(Game.Fire.prototype);
+  FClose.prototype.constructor = FClose;
+
+
 
   //only called on client. 
   FClose.prototype.draw = function(context, xView, yView, scale){
