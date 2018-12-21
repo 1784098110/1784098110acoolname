@@ -101,7 +101,8 @@
         
           //Fetch the viewport
         this.canvas = document.getElementById('gameCanvas');
-        this.showMap = false;//show player map toggle ?? where should this toggle be for best practice?
+        this.showMap = false;
+        this.showMiniMap = true;
         this.upperMap;//to be created by map
         this.gtoggledObstacles = new Set();//list of obstacles that toggle graphics due to players zones occupation
 
@@ -1715,7 +1716,7 @@
     this.drawObstacles(ctx, xView, yView, scale, subGridX, subGridY, subGridXMax, subGridYMax);
 
     //always draw minimap
-    this.drawMiniMap(ctx, width, height);
+    if(this.showMiniMap) this.drawMiniMap(ctx, width, height);
 
     //player map, mini map and stats don't care about scale. 
     if(this.showMap) this.drawPlayerMap(ctx, width, height);
@@ -1740,6 +1741,8 @@
      * todotodo.
      *  
      * draw graphics based on level. replace glist with graphic levels, distinguish not by zone or fire etc
+     * improve object size decrease curve. if obj already too close to base size 
+     *  decrease vs health reduction is too small. and rec should not blindly base health on width
      * 
      */
     /**
@@ -1759,28 +1762,28 @@
      * 
      */
     
-    const gList = Game.enums.GList.obstacle;
     const obstacles = this.obstacles;
     const grid = this.self.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
     const drawn = [];
 
     //iterating occupied graphic grid to get relevant obstacles to draw
-    for(let i = subGridX; i < subGridXMax; i++){
-      for(let j = subGridY; j < subGridYMax; j++){
-        //if(debug && grid[i][j][gList].length > 0) console.log(`draw obstacles gridg[i][j] length: ${grid[i][j][gList].length} i: ${i} j: ${j} subgirdX: ${subGridX} subgridy: ${subGridY} subgirdXmax: ${subGridXMax} subgridymax: ${subGridYMax} `);
+    for(let g = Game.enums.GList.obstacle; g <= Game.enums.GList.treeCrown; g++){
+      for(let i = subGridX; i < subGridXMax; i++){
+        for(let j = subGridY; j < subGridYMax; j++){
 
-        if(debug && (!grid[i] || !grid[i][j])) console.log(`drawObstacles: grid: i: ${i} j: ${j}`);
-        grid[i][j][gList].forEach(obj => {
-          if(debug) console.assert(obj.oID !== undefined);
-          if(drawn[obj.oID]) return;//if already drawn
+          if(debug && (!grid[i] || !grid[i][j])) console.log(`drawObstacles broke: grid: i: ${i} j: ${j}`);
+          grid[i][j][g].forEach(obj => {
+            if(debug) console.assert(obj.oID !== undefined);
+            if(drawn[obj.oID]) return;//if already drawn
 
-          //some obstacles have different graphics under certain situations
-          let toggle = false;//optimize. don't need to store it
-          if(this.gtoggledObstacles.has(obj.oID)) toggle = true;
+            //some obstacles have different graphics under certain situations
+            let toggle = false;//optimize. don't need to store it
+            if(this.gtoggledObstacles.has(obj.oID)) toggle = true;
 
-          obstacles.get(obj.oID).draw(context, xView, yView, scale, toggle);
-          drawn[obj.oID] = true;
-        });
+            obstacles.get(obj.oID).draw(context, xView, yView, scale, toggle);
+            drawn[obj.oID] = true;
+          });
+        }
       }
     }
 

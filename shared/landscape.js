@@ -76,8 +76,8 @@
         this.zoneGridUnder[i][j] = [];
         if(j % graphicRatio === 0 && graphicGrid){
           jg = j / graphicRatio;
-          this.gridgUpper[ig][jg] = [[], [], [], []];
-          this.gridgUnder[ig][jg] = [[], [], [], []];
+          this.gridgUpper[ig][jg] = [[], [], [], [], []];
+          this.gridgUnder[ig][jg] = [[], [], [], [], []];
         }
       }
     }
@@ -235,7 +235,7 @@
     if(debug) console.assert(obj.upperGround !== undefined);
 
     const gList =  obj.gList;
-    if(debug) console.assert(gList && gList < 4);
+    if(debug) console.assert(gList !== undefined);
     let grid, gridg;
     [grid, gridg] = (obj.upperGround === true) ? [this.gridUpper, this.gridgUpper] : [this.gridUnder, this.gridgUnder];
 
@@ -732,7 +732,7 @@
       part.yMax = this.yMax;
       part.upperGround = this.upperGround;
       part.angle = this.angle;//optimize. circle already pass in angle at constructions, just pass in angle at other shapes' construct too
-      part.gList = Game.enums.GList.obstacle;
+      if(part.gList === undefined) part.gList = Game.enums.GList.obstacle;//some parts have specially assigned glists
 
       //if obstacle's size changes with health of a certain part
       if(this.healthPart && (part.opType !== this.healthPart.opType)){
@@ -887,10 +887,12 @@
     let trunk = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.1);
     trunk.color = 'brown';
     trunk.opType = Game.enums.OPType.treeTrunk;
+    trunk.gList = Game.enums.GList.treeCrown;//because obstacle's parts are drawn together, put them in same glist
 
     let crown = new Game.Circle(radius * 4, this.x, this.y, this.angle, true, undefined);
     crown.color = 'rgba(102, 204, 0, 0.5)';
     crown.opType = Game.enums.OPType.treeCrown;
+    crown.gList = Game.enums.GList.treeCrown;
 
     //todo. colors should be sprites. but individual sprites or aggregate sprite? what about house with its furnitures? those need individual sprites
 

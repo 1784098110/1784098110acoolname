@@ -37,7 +37,7 @@ Game.enums = {
   OPType: Object.freeze({'treeTrunk': 0, 'treeCrown': 1, 'rock': 2, 'house11': 3, 'house12': 4, 'house13': 5, 'bush': 6, 'box': 7}),
   CType: Object.freeze({'bushFence': 0, 'rock': 1, 'house': 2, 'entrance': 3, 'bush': 4}),
   TType: Object.freeze({'river': 0, 'dessert': 1, 'swamp': 2, 'beach': 3}),
-  GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3}),
+  GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
   ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 3, 'entrance': 4, 'hiding': 5})
 
 };

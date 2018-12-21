@@ -213,6 +213,9 @@ window.onload = function(){
 			case 77: // M
 				game.showMap = !game.showMap;
 				break;
+			case 86: // V
+				game.showMiniMap = !game.showMiniMap;
+				break;
 			case 32: //space
 				game.controls.skill = false;
 			case 27: //Esc
