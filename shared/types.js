@@ -419,7 +419,7 @@ Game.enums = {
 //Circle
 (function(){
   function Circle(r, x, y, angle, passable, shield){
-    Game.Gobject.call(this, x, y, Game.enums.Shape.circle, angle, passable, shield, r * 2);
+    Game.Gobject.call(this, x, y, Game.enums.Shape.circle, angle, passable, shield, r * r / 20);//magic number. otherwise too much health
     this.radius = r;
   }
   Circle.prototype = Object.create(Game.Gobject.prototype);

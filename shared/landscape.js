@@ -719,7 +719,7 @@
       else if(part.shape === Game.enums.Shape.circle){
         //keep ratios to change obstacles size upon damage
         part.baseRadius = this.baseRadius;
-        part.radiusToHealth = (part.radius - part.baseRadius) / health;
+        part.radiusToHealth = (part.radius * part.radius - part.baseRadius * part.baseRadius) / health;
       }
     }
     //add bounds to all parts
@@ -747,7 +747,7 @@
         else if(part.shape === Game.enums.Shape.circle){
           //keep ratios to change obstacles size upon damage
           part.baseRadius = Math.round(part.radius / (this.healthPart.radius || this.healthPart.width / 2) * (this.healthPart.baseRadius || this.healthPart.baseWidth / 2));
-          part.radiusToHealth = (part.radius - part.baseRadius) / health;
+          part.radiusToHealth = (part.radius * part.radius - part.baseRadius * part.baseRadius) / health;
         }
       }
 
@@ -856,7 +856,7 @@
         
         this.parts.forEach(obj => {
           if(obj.shape === Game.enums.Shape.circle){
-            obj.radius = Math.round(health * obj.radiusToHealth) + obj.baseRadius;
+            obj.radius = Math.sqrt(Math.round(health * obj.radiusToHealth) + obj.baseRadius * obj.baseRadius);
             //if(debug) console.log(`obstacle update part: radius: ${obj.radius} optype: ${obj.opType} baseradius: ${obj.baseRadius} radiustohealth: ${obj.radiusToHealth}`);
           }
           else if(obj.shape === Game.enums.Shape.rectangle){

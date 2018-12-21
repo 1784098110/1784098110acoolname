@@ -1739,14 +1739,12 @@
     
     /**
      * todotodo.
-     *  
-     * draw graphics based on level. replace glist with graphic levels, distinguish not by zone or fire etc
-     * improve object size decrease curve. if obj already too close to base size 
-     *  decrease vs health reduction is too small. and rec should not blindly base health on width
+     *
      * 
      */
     /**
      * ??
+     * Draw trunk and crown on same level still too unnatural? draw obstacle parts separatedly is only way to solve
      * Instead of skill and weapons' spriteindex, just pass all the sprite indexes about player? (to cover special effect etc)
      *  or add special graphic ids about player ITSELF in addition to tool's indexes.
      * Player randomly flashed to close to upper edge after destroying a box ?! or did i hallucinate
