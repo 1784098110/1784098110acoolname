@@ -19,6 +19,9 @@
     this.shape;
     this.hitOnce;//if fire disapears after one hit
     this.hurtOnce;//if fire only causes one time damage
+    //for !hurtonce fires
+    this.lastDmg;
+    this.dmgInterval = 100;//magic number. the interval between successive dmg register
 
     this.fID;//fire id to be assigned by game core after construction. ?? needed on client side for removal? got to be a more elegant way to inform clients of fire removal
     this.player = player;
@@ -33,6 +36,9 @@
 
     //array that belongs to core that stores ids of objects who need to update stats
     this.toUpdateStatsObjects;//server only, externally assigned
+
+    //wType specific functions
+    this.onTravelEnd;
 
     //decide fire details based on WType
     //todo. add sprite
@@ -66,7 +72,7 @@
       break;
 
       case(Game.enums.WType.katana):
-      this.dmg = 30;
+      this.dmg = 60;
       this.range = 62;
       this.life = 500;
       this.shape = Game.enums.Shape.circle;
@@ -78,6 +84,31 @@
       this.hurtOnce = true;
       this.color = undefined;//testing
       this.update = this.closeUpdate;
+      break;
+
+      case(Game.enums.WType.fireball):
+      this.dmg = 5;
+      this.range = 200;
+      this.speed = 100;
+      this.shape = Game.enums.Shape.circle;
+      this.radius = 35;
+      this.traveled = traveled || 0;
+      this.hitOnce = false;
+      this.hurtOnce = false;
+      this.color = 'orange';
+      this.update = this.shootUpdate;
+      break;
+
+      case(Game.enums.WType.teleport):
+      this.range = 300;
+      this.speed = 1000;
+      this.shape = Game.enums.Shape.point;
+      this.radius = 25;
+      this.traveled = traveled || 0;
+      this.hitOnce = false;
+      this.color = 'rgba(255, 255, 255, 0.2)';
+      this.update = this.shootUpdate;
+      this.onTravelEnd = this.onTeleportTravelEnd;
       break;
 
       default:
@@ -170,18 +201,18 @@
       }  break;
     }
     //handle collision if collide
-    if(collide){
-      if(other.health){//if other has health do dmg
-        this.handleDmgCollide(other);
-      }
-      if(debug) console.assert(!other.passable);//passables should not be passed in
-      if(this.hitOnce) this.terminate = true;//kill fire if hitonce
-    }
+    if(!collide) return;
+    if(debug) console.assert(!other.passable);//passables should not be passed in
 
-
+    if(other.health && this.dmg) this.handleDmgCollide(other);//do dmg if appropriate
+    if(this.wType === Game.enums.WType.teleport && other.oID !== undefined) this.onTravelEnd();//if teleport only obstacle collision count
+  
   }
+
+  //WType specific collision handling
   Fire.prototype.handleDmgCollide = function(other){
     if(this.terminate) return;//terminate is decided and handled outside of this funciton.
+    if(this.hitOnce) this.terminate = true;//kill fire if hitonce
     if(other.tID === this.tID) return;//don't hurt if on the same team. obstacles don't have tid
 
     //if(debug) console.log('fire: hitonce: ' + this.hitOnce + ' hurtOnce: ' + this.hurtOnce + ' passable: ' + this.passable + ' hit: ' + this.hit);
@@ -192,12 +223,17 @@
       if(this.hit.includes(other.jID)) return;
       else this.hit.push(other.jID);
     }
+    //don't register dmg if !hurtonce and time lapse is smaller than dmginterval
+    if(!this.hurtOnce){
+      if(Date.now() - this.lastDmg < this.dmgInterval) return;
+      else this.lastDmg = Date.now();
+    } 
 
-    if(debug) console.assert(this.pID !== undefined);
+    //register dmg
+    other.dmgs.push({pID: this.pID, dmg: this.dmg, wType: this.wType});
     
-    other.dmgs.push({pID: this.pID, dmg: this.dmg, wType: this.wType});//add dmg object to be processed by the receiver on its update
-    
-    if(other.name === undefined){//if other is not a player, need to put it on update stats list
+    //if dmg is registered and other is not a player, need to put it on update stats list
+    if(other.name === undefined){
       if(debug) console.assert(other.jID !== undefined);//should only have objs
       //if(debug) console.log('fire hits obj: fId: ' + this.fID + ' other.jid: ' + other.jID + ' other.health: ' + other.health);   
 
@@ -207,11 +243,19 @@
     //if(debug) console.log('fire hits obj: fId: ' + this.fID + ' other.jid: ' + other.jID + ' other.health: ' + other.health);   
     //if(debug) console.log(' other dmgs: ' + other.dmgs);
   }
+  Fire.prototype.onTeleportTravelEnd = function(){
+    this.terminate = true;
+    this.player.x = this.x;
+    this.player.y = this.y;
+
+    //if(debug) console.log(`teleport travel end: player: x: ${this.player.x} y: ${this.player.y}`);
+  }
 
   Fire.prototype.shootUpdate = function(t){//time: update time in milliseconds
 
     //fshoot life is unrelated to time but to travel distance
     if(this.traveled > this.range){
+      if(this.onTravelEnd) this.onTravelEnd();
       this.terminate = true;//indicate the object should dissapear now. 
       return;
     }
@@ -223,7 +267,7 @@
     //if(debug) console.log('fire update: this.traveled: ' + this.traveled + ' range: ' + this.range + ' step: ' + step);
     //if(debug) console.log('fire update fID: ' + this.fID + ' x: ' + this.x + ' y: ' + this.y);
 
-    this.move(this.angle, d);
+    this.move(this.angle, d, true);
     this.traveled += Math.round(d);//traveled is only used for termination so keep it integer. or not??
   }  
   Fire.prototype.closeUpdate = function(t){//time: update time in milliseconds
@@ -251,7 +295,9 @@
 
   //only called on client. 
   Fire.prototype.draw = function(context, xView, yView, scale){
-    if(!this.color) return;//if fire has not graphics
+    if(!this.color) return;//if fire has no graphics
+
+    if(debug) console.log(`fire draw: fID: ${this.fID} color: ${this.color} radius: ${this.radius} x: ${this.x} y: ${this.y}`);
 
     context.fillStyle = this.color;//TESTING
     context.beginPath();

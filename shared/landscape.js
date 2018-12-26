@@ -383,6 +383,7 @@
     let y = Math.floor(obj.y / this.cellSize);
 
     //potential occupying zones
+    if(debug && !grid[x][y]) console.log(` ::ERROR:: handlezones grid out of bound: x: ${x} y: ${y}`); 
     let zones = grid[x][y];
     let lastCheck = [];
 

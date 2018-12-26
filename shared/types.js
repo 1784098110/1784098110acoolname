@@ -28,17 +28,22 @@ window.PI = 3.14159;
 
 //enums
 Game.enums = {
+  //General
   Shape: Object.freeze({'custom': 0, 'rectangle':1, 'circle':2, 'line':3, 'point':4}),
   PState: Object.freeze({'dead':0, 'active':1, 'spectate':2, 'protect':3}),
-  TClass: Object.freeze({'none': 0, 'close':1, 'shoot':2, 'mute':3}),
-  WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'flash': 8, 'heal': 9, 'immune': 10, 'stealth': 11}),
   GOver: Object.freeze({'death': 0, 'teamWin': 1, 'teamLose': 2, 'playerWin': 3, 'playerLost':4}),
+  GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
+  
+  //Tool
+  WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'teleport': 8, 'heal': 9, 'invincible': 10, 'stealth': 11, 'relocate': 12}),
+  EType: Object.freeze({'invincible': 0, 'bleed': 1, 'heal': 2, 'entrance': 3, 'bush': 4, 'box': 5}),
+  
+  //Land
   OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 3, 'bush': 4, 'box': 5}),
   OPType: Object.freeze({'treeTrunk': 0, 'treeCrown': 1, 'rock': 2, 'house11': 3, 'house12': 4, 'house13': 5, 'bush': 6, 'box': 7}),
   CType: Object.freeze({'bushFence': 0, 'rock': 1, 'house': 2, 'entrance': 3, 'bush': 4}),
   TType: Object.freeze({'river': 0, 'dessert': 1, 'swamp': 2, 'beach': 3}),
-  GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
-  ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 3, 'entrance': 4, 'hiding': 5})
+  ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 3, 'entrance': 4, 'hiding': 5}),
 
 };
 
@@ -113,8 +118,8 @@ Game.enums = {
   //todo. for angle and distance movement should instead use destination point so as to avoid deviation due to rounding over time
   Gobject.prototype.move = function(angle, d, round){//both params are decimal, whole decides if to round to int or not
     //?? optimize. floor is causing rounding issues, but coor has to be rounded when drawn anyway. what to do?
-    let dx = (Math.cos(angle) * d).fixed();
-    let dy = (Math.sin(angle) * d).fixed();
+    let dx = (Math.cos(angle) * d);
+    let dy = (Math.sin(angle) * d);
 
     if(round){
       dx = Math.round(dx);
@@ -714,7 +719,7 @@ Game.enums = {
     this.speed = speed;
     this.vision = vision;
 
-    this.state;//initially undefined
+    this.state;//initially undefined, active, daed, spectate etc.
 
     this.color = color;//todo. should also allow sprite(custom skin)
     this.name = name;
@@ -755,7 +760,12 @@ Game.enums = {
       }
     }
     this.dmgs = [];  
-    
+
+    //proess effects
+    this.effects.forEach(effect => {
+      effect.update(this);
+    });
+
   }
 
   //change combat stats based on player config

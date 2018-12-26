@@ -6,24 +6,21 @@
     this.lastFire = 0;
 
     this.spriteIndex = 0;//for animation
-    this.spriteCount;
+    this.spriteCount = 1;//default to no animation
 
     this.wType = wType;
     this.cool;
-    this.holdRadius;//also used to indicate left or right hand
-    this.length;
+    this.holdRadius = 0;//also used to indicate left or right hand
+    this.length;//distance between firing end and holding base
 
     this.fire;//method to be assigned based on wtype
     this.firing = false;//is this a necessary property ?? repetitive of cool?
     this.tID;
     this.player;
 
-    //length is the distance between firing end and holding base
-    //1 spriteCount means no sprite or unchanging sprite
     //addGraphic arguments: sprite, scale, drawXScale, drawYScale
     switch(wType){
       case(Game.enums.WType.fist):
-      this.spriteCount = 1;
       this.cool = 200;
       this.length = 20;
       this.holdRadius = 15;
@@ -34,7 +31,6 @@
       case(Game.enums.WType.katana):
       this.spriteCount = 8;
       this.cool = 1000;
-      this.length = undefined;
       this.holdRadius = 15;
       this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
       this.fire = this.closeFire;
@@ -43,38 +39,43 @@
       case(Game.enums.WType.dagger):
       this.spriteCount = 3;
       this.cool = 100;
-      this.length = undefined;
       this.holdRadius = 15;
       this.addGraphic(Game.sprites[this.wType], 0.2, 0, 0);
       this.fire = this.closeFire;
       break;
 
       case(Game.enums.WType.fireball):
-      this.spriteCount = 1;
       this.cool = 5000;
       this.length = 20;
-      this.holdRadius = 0;
       this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
-      this.fire = this.fireballFire;
+      this.fire = this.shootFire;
       break;
 
       case(Game.enums.WType.heal):
-      this.spriteCount = 1;
-      this.cool = 10000;
-      this.length = undefined;
-      this.holdRadius = 0;
+      this.cool = 12000;
       this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
       this.fire = this.healFire;
       break;
 
+      case(Game.enums.WType.teleport):
+      this.cool = 9000;
+      this.length = 20;
+      this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
+      this.fire = this.shootFire;
+      break;
+
+      case(Game.enums.WType.invincible):
+      this.cool = 6000;
+      this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
+      this.fire = this.invincibleFire;
+      break;
+
       case(Game.enums.WType.stealth):
-      this.spriteCount = 1;
       this.cool = 15000;
-      this.length = undefined;
-      this.holdRadius = 0;
       this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
       this.fire = this.stealthFire;
       break;
+
 
     }
   }
@@ -87,9 +88,14 @@
   }
   Tool.prototype.ready = function(){
     
-    //if(debug) console.log('Skill.ready: lastFire: ' + this.lastFire + ' now: ' + time + ' cool: ' + this.cool);
-
-    return ((Date.now() - this.lastFire) > this.cool); //if skill is cooling return nothing
+    //if(debug && this.wType === Game.enums.WType.heal) console.log('Skill.ready: lastFire: ' + this.lastFire + ' now: ' + Date.now() + ' cool: ' + this.cool);
+    
+    if((Date.now() - this.lastFire) > this.cool){
+      this.firing = true;
+      this.lastFire = Date.now();
+      return true;
+    } 
+    //if skill is cooling return nothing
   }
   //client only, add necessary graphic stats, return if no sprite(server or just no sprite)
   Tool.prototype.addGraphic = function(sprite, scale, drawXScale, drawYScale){
@@ -153,8 +159,6 @@
   //different fire methods for different tools
   //arguments: game, mouse x, mouse y(all relative to world)
   Tool.prototype.shootFire = function(game, mx, my){//optimize stored vaiables
-    this.firing = true;
-    this.lastFire = Date.now();
 
     const x1 = this.player.x;
     const y1 = this.player.y;
@@ -174,9 +178,6 @@
   }
   Tool.prototype.closeFire = function(game, mx, my){
 
-    this.firing = true;
-    this.lastFire = Date.now();
-
     const x1 = this.player.x;
     const y1 = this.player.y;
     const angle = this.player.angle;
@@ -190,11 +191,15 @@
     game.server_addFire(new Game.Fire(x, y, angle, this.player, this.wType, undefined, this.holdRadius));
   }
   Tool.prototype.healFire = function(game, mx, my){
+
     const player = this.player;
-    if(debug) console.log(`heal fired: pID: ${player.pID}`);
+    //if(debug) console.log(`heal fired: pID: ${player.pID} health: ${player.health} maxhealth: ${player.maxHealth} cool: ${this.cool}`);
       
     player.health += 30;
-    if(player.health > player.maxhHealth) player.health = player.maxhHealth;
+    if(player.health > player.maxHealth) player.health = player.maxHealth;
+  }
+  Tool.prototype.invincibleFire = function(game, mx, my){
+
   }
 
   Game.Tool = Tool;

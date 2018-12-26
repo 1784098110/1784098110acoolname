@@ -194,6 +194,7 @@ window.onload = function(){
 				break;
 			case 32: //space
 				game.controls.skill = true;
+				break;
 		}
 	}, false);
 	window.addEventListener("keyup", function (e) {
@@ -218,6 +219,7 @@ window.onload = function(){
 				break;
 			case 32: //space
 				game.controls.skill = false;
+				break;
 			case 27: //Esc
 				break;
 		}
