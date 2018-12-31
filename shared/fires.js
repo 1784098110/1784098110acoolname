@@ -297,7 +297,7 @@
   Fire.prototype.draw = function(context, xView, yView, scale){
     if(!this.color) return;//if fire has no graphics
 
-    if(debug) console.log(`fire draw: fID: ${this.fID} color: ${this.color} radius: ${this.radius} x: ${this.x} y: ${this.y}`);
+    //if(debug) console.log(`fire draw: fID: ${this.fID} color: ${this.color} radius: ${this.radius} x: ${this.x} y: ${this.y}`);
 
     context.fillStyle = this.color;//TESTING
     context.beginPath();

@@ -37,7 +37,8 @@ Game.enums = {
   //Tool
   WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'teleport': 8, 'heal': 9, 'invincible': 10, 'stealth': 11, 'relocate': 12}),
   EType: Object.freeze({'invincible': 0, 'bleed': 1, 'heal': 2, 'entrance': 3, 'bush': 4, 'box': 5}),
-  
+  Token: Object.freeze({'invincible': 0}),
+
   //Land
   OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 3, 'bush': 4, 'box': 5}),
   OPType: Object.freeze({'treeTrunk': 0, 'treeCrown': 1, 'rock': 2, 'house11': 3, 'house12': 4, 'house13': 5, 'bush': 6, 'box': 7}),
@@ -682,6 +683,7 @@ Game.enums = {
     context.translate(this.x-xView, this.y - yView); //convert player position to canvas postiion
     context.rotate(angle - PI/2);//to compensate for vertical weapon sprites, tweek the angle when drawing.
 
+    //if in a bush etc. optimize. inefficient to assign and assign back each time?
     if(this.transparency !== undefined) context.globalAlpha = this.transparency;
 
     this.lWeapon.draw(context); 
@@ -693,6 +695,8 @@ Game.enums = {
     context.arc(0, 0, this.radius, 0, 2 * PI);
     context.fill();
     context.closePath();
+
+    this.skill.draw(context);
     
     context.restore();
     this.transparency = undefined;//revert back to default
@@ -728,12 +732,13 @@ Game.enums = {
 
     //?? better way to tag zones. right now it's just clearing map each time them setting occupied zTypes to true. 
     this.zones = new Map();//zID for each type of occupied zone.
+    this.effects = [];//buffs etc. update and terminate themselves
+    this.tokens = new Map();//markers. todo. no need for map just set?
 
     this.initCombatStats();
 
     //if(debug) console.log("Character constructor: speed: " + this.speed + ' shield: ' + this.shield + ' vision: ' + this.vision);
-    //OPTIMIZE - try this so don't calculate speeddiag each time. how much difference would it make?
-    //speedDiag = Math.sqrt(speed * speed /2) //COUPLED - always proportional to speed
+    //OPTIMIZE - save speedDiag to variable so don't calculate speeddiag each time. how much difference would it make?
     
   }
 
@@ -744,28 +749,31 @@ Game.enums = {
   Character.prototype.updateStats = function(){
 
     //if(debug) console.log('Character updateStats: health before update: ' + this.health);
-
-    //process each dmg
-    for(let i = 0, l = this.dmgs.length; i < l; i++){
-      let dmgObj = this.dmgs[i];
-
-      //change dmg by shield level and deduct from health
-      let dmg = Math.floor(dmgObj.dmg * (1 - this.shield));
-      this.health -= dmg;
-
-      //if killed, remember killer, player state later changed by game
-      if(this.health <= 0) {
-        this.killerID = dmgObj.pID;
-        //if(debug) console.log('character killed by dmg: pID: ' + dmgObj.pID);
-      }
-    }
-    this.dmgs = [];  
-
-    //proess effects
+    
+    //process effects
     this.effects.forEach(effect => {
-      effect.update(this);
+      effect.update();
     });
 
+    //pass dmg processing if invincible
+    if(!this.tokens.has(Game.enums.Token.invincible)){//optimize. inefficient to check map each time?
+      for(let i = 0, l = this.dmgs.length; i < l; i++){
+        let dmgObj = this.dmgs[i];
+  
+        //change dmg by shield level and deduct from health
+        let dmg = Math.floor(dmgObj.dmg * (1 - this.shield));
+        this.health -= dmg;
+  
+        //if killed, remember killer, player state later changed by game
+        if(this.health <= 0) {
+          this.killerID = dmgObj.pID;
+          //if(debug) console.log('character killed by dmg: pID: ' + dmgObj.pID);
+        }
+      }
+    }
+    else if(debug) console.log(`invincible!`);
+    
+    this.dmgs = [];  
   }
 
   //change combat stats based on player config

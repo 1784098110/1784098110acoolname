@@ -1,28 +1,27 @@
 (function(){
 
-  function Effect(eType, rate, length){
-    //rate: amount per time interval, length: time effective
+  function Effect(eType, player){
+    //Variables if applicable: rate: amount per time interval, length: time effective
     this.eType = eType;
+    this.player = player;
 
-    this.rate = rate;
-    this.length = length;
     this.startTime = Date.now();
 
     this.update;//called by character updatestats
 
     switch(eType){
     case(Game.enums.EType.invincible):
-    this.invincible();
+    //?? what if different lengths of invincible? assign after call? pass in additional arguments?
+    this.length = 4000;//magic number. 
+    this.update = this.invincibleUpdate;
+    this.player.tokens.set(Game.enums.Token.invincible, true);
     break;
     
     }
   }
 
-  Effect.prototype.invincible = function(){
-    this.update = this.invincibleUpdate;
-  }
-  Effect.prototype.invincibleUpdate= function(){
-      //todotodo.generalize effect methods?
+  Effect.prototype.invincibleUpdate = function(){
+      if(Date.now() - this.startTime > this.length) this.player.tokens.delete(Game.enums.Token.invincible);
   }
 
 

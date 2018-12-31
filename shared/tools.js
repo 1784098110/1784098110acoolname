@@ -199,7 +199,7 @@
     if(player.health > player.maxHealth) player.health = player.maxHealth;
   }
   Tool.prototype.invincibleFire = function(game, mx, my){
-
+    this.player.effects.push(new Game.Effect(Game.enums.EType.invincible, this.player));
   }
 
   Game.Tool = Tool;
