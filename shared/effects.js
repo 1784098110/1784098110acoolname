@@ -6,6 +6,7 @@
     this.player = player;
 
     this.startTime = Date.now();
+    this.terminate = false;//to let owner delete when necessary
 
     this.update;//called by character updatestats
 
@@ -19,9 +20,28 @@
     
     }
   }
+  Effect.prototype.draw = function(context){
+    
+    switch(this.eType){
+      case(Game.enums.EType.invincible):
+      if(debug) console.log(`effect draw: eType: ${this.eType}`);
+      context.beginPath();
+      context.strokeStyle = 'rgb(255, 215, 0)';
+      context.lineWidth = 3;
+      context.arc(0, 0, this.player.radius, 0, 2 * PI);
+      context.stroke();
+      break;
+      
+    }
+  }
 
   Effect.prototype.invincibleUpdate = function(){
-      if(Date.now() - this.startTime > this.length) this.player.tokens.delete(Game.enums.Token.invincible);
+      if(Date.now() - this.startTime > this.length){
+        //delete associated token
+        this.player.tokens.delete(Game.enums.Token.invincible);
+        //delete effect from player effects list
+        this.terminate = true;
+      } 
   }
 
 

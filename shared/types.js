@@ -646,10 +646,9 @@ Game.enums = {
   Game.Circle = Circle;
 })();
 
-
-//Entity
+//Character
 (function(){
-  function Entity(tID, lWeapon, rWeapon, skill, shield){
+  function Character(health, speed, vision, tID, lWeapon, rWeapon, skill, color, name){
     Game.Circle.call(this, 25, 0, 0, 0, false, shield);
 
     this.tID = tID;
@@ -663,60 +662,6 @@ Game.enums = {
     this.skill = new Game.Tool(skill);
     this.skill.equip(this, undefined);
 
-  }
-
-  Entity.prototype = Object.create(Game.Circle.prototype);
-  Entity.prototype.constructor = Entity;
-
-  //TODO, need map info for spawn (boundary etc.), or let caller do it?
-  Entity.prototype.spawn = function(x, y){
-    this.x = x;
-    this.y = y;
-  }
-  Entity.prototype.draw = function(context, xView, yView){//optimize. partially repeating circle draw.
-    const angle = this.angle;
-
-    //if(debug) console.log('entity.draw: pID: ' + this.pID + ' angle: ' + angle);
-
-    context.save();
-    //if(debug) console.log(this.x - xView, this.y - yView);
-    context.translate(this.x-xView, this.y - yView); //convert player position to canvas postiion
-    context.rotate(angle - PI/2);//to compensate for vertical weapon sprites, tweek the angle when drawing.
-
-    //if in a bush etc. optimize. inefficient to assign and assign back each time?
-    if(this.transparency !== undefined) context.globalAlpha = this.transparency;
-
-    this.lWeapon.draw(context); 
-    this.rWeapon.draw(context);
-
-    //draw player circle
-    context.fillStyle = this.color;//testing
-    context.beginPath();			
-    context.arc(0, 0, this.radius, 0, 2 * PI);
-    context.fill();
-    context.closePath();
-
-    this.skill.draw(context);
-    
-    context.restore();
-    this.transparency = undefined;//revert back to default
-  }
-
-  //?? awkward method. where should animation be updated?
-  Entity.prototype.updateGraphics = function(){
-    //if(debug) console.log(`entity updategraphics`);
-    this.lWeapon.updateGraphics();
-    this.rWeapon.updateGraphics();
-    this.skill.updateGraphics();
-  }   
-
-  Game.Entity = Entity;
-})();
-
-//Character
-(function(){
-  function Character(health, speed, vision, tID, lWeapon, rWeapon, skill, color, name){
-    Game.Entity.call(this, tID, lWeapon, rWeapon, skill, 0);
     //combat stats
     this.health = health;
     this.maxHealth = this.health;
@@ -724,10 +669,8 @@ Game.enums = {
     this.vision = vision;
 
     this.state;//initially undefined, active, daed, spectate etc.
-
     this.color = color;//todo. should also allow sprite(custom skin)
     this.name = name;
-
     this.killerID; //to be assigned when killed to remember killer
 
     //?? better way to tag zones. right now it's just clearing map each time them setting occupied zTypes to true. 
@@ -742,7 +685,7 @@ Game.enums = {
     
   }
 
-  Character.prototype = Object.create(Game.Entity.prototype);
+  Character.prototype = Object.create(Game.Circle.prototype);
   Character.prototype.constructor = Character;
 
   //update personal stats like health based on dmgs received ?? combine with obj update stats?
@@ -753,6 +696,7 @@ Game.enums = {
     //process effects
     this.effects.forEach(effect => {
       effect.update();
+      if(effect.terminate) 
     });
 
     //pass dmg processing if invincible
@@ -829,7 +773,52 @@ Game.enums = {
     }
     if(setZone) this.zones.set(obj.zType, obj.zID);
   }
+
+  //TODO, need map info for spawn (boundary etc.), or let caller do it?
+  Character.prototype.spawn = function(x, y){
+    this.x = x;
+    this.y = y;
+  }
+  Character.prototype.draw = function(context, xView, yView){//optimize. partially repeating circle draw.
+    const angle = this.angle;
+
+    //if(debug) console.log('entity.draw: pID: ' + this.pID + ' angle: ' + angle);
+
+    context.save();
+    //if(debug) console.log(this.x - xView, this.y - yView);
+    context.translate(this.x-xView, this.y - yView); //convert player position to canvas postiion
+    context.rotate(angle - PI/2);//to compensate for vertical weapon sprites, tweek the angle when drawing.
+
+    //if in a bush etc. optimize. inefficient to assign and assign back each time?
+    if(this.transparency !== undefined) context.globalAlpha = this.transparency;
+
+    this.lWeapon.draw(context); 
+    this.rWeapon.draw(context);
+
+    //draw player circle
+    context.fillStyle = this.color;//testing
+    context.beginPath();			
+    context.arc(0, 0, this.radius, 0, 2 * PI);
+    context.fill();
+    context.closePath();
+
+    this.skill.draw(context);
+    this.tokens.forEach((value, token) => {
+      if(debug) console.log(`token draw`);
+      this.drawToken(context, token, value);
+    });
+    
+    context.restore();
+    this.transparency = undefined;//revert back to default
+  }
   
+  //?? awkward method. where should animation be updated?
+  Character.prototype.updateGraphics = function(){
+    //if(debug) console.log(`entity updategraphics`);
+    this.lWeapon.updateGraphics();
+    this.rWeapon.updateGraphics();
+    this.skill.updateGraphics();
+  }   
 
   Game.Character = Character;
 })();
@@ -895,7 +884,7 @@ Game.enums = {
 
   //caller responsible for location
   Player.prototype.spawn = function(x, y){
-    Game.Entity.prototype.spawn.call(this, x, y);
+    Game.Character.prototype.spawn.call(this, x, y);
 
     this.state = Game.enums.PState.active;
     this.upperGround = true;//players always spawn above ground
