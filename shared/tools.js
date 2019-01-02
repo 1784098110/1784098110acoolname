@@ -51,6 +51,13 @@
       this.fire = this.shootFire;
       break;
 
+      case(Game.enums.WType.snipeShot):
+      this.cool = 5000;
+      this.length = 30;
+      this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
+      this.fire = this.shootFire;
+      break;
+
       case(Game.enums.WType.heal):
       this.cool = 12000;
       this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
@@ -65,15 +72,21 @@
       break;
 
       case(Game.enums.WType.invincible):
-      this.cool = 6000;
+      this.cool = 18000;
       this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
       this.fire = this.invincibleFire;
       break;
 
       case(Game.enums.WType.stealth):
-      this.cool = 15000;
+      this.cool = 6000;
       this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
       this.fire = this.stealthFire;
+      break;
+
+      case(Game.enums.WType.relocate):
+      this.cool = 1500;
+      this.addGraphic(Game.sprites[this.wType], 0.8, 0.5, 0.5);
+      this.fire = this.relocateFire;
       break;
 
 
@@ -86,6 +99,7 @@
 
     if(this.holdRadius && left === false) this.holdRadius = -this.holdRadius;
   }
+  //if return true, fire is guaranteed to follow
   Tool.prototype.ready = function(){
     
     //if(debug && this.wType === Game.enums.WType.heal) console.log('Skill.ready: lastFire: ' + this.lastFire + ' now: ' + Date.now() + ' cool: ' + this.cool);
@@ -93,6 +107,13 @@
     if((Date.now() - this.lastFire) > this.cool){
       this.firing = true;
       this.lastFire = Date.now();
+
+      //breakout of stealth if applicable
+      if(this.player.tokens.has(Game.enums.Token.stealth)){
+        //if(debug) console.log(`tool ready kill stealt token: self wtype: ${this.wType} stealth token left: ${this.player.tokens.get(Game.enums.Token.stealth)}`);
+        this.player.server_removeToken(Game.enums.Token.stealth, true);
+      }
+
       return true;
     } 
     //if skill is cooling return nothing
@@ -200,6 +221,12 @@
   }
   Tool.prototype.invincibleFire = function(game, mx, my){
     this.player.effects.push(new Game.Effect(Game.enums.EType.invincible, this.player));
+  }
+  Tool.prototype.stealthFire = function(game, mx, my){
+    this.player.effects.push(new Game.Effect(Game.enums.EType.stealth, this.player));
+  }
+  Tool.prototype.relocateFire = function(game, mx, my){
+    this.player.spawn((Math.random() * (this.player.xMax - this.player.xMin) + this.player.xMin), (Math.random() * (this.player.yMax - this.player.yMin) + this.player.yMin));
   }
 
   Game.Tool = Tool;

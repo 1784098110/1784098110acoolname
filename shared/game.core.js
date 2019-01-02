@@ -366,7 +366,7 @@
       if(debug) console.log(' :: Player Join: pID: ' + player.pID);
     }
   }
-
+  //called by server_playerconnect when ws is connected
   game_core.prototype.server_addPlayer = function(playerConfig){
     
     if(debug) console.log(' :: AddPlayer: pID: ' + playerConfig.pID + ' tID: ' + playerConfig.tID + ' player count before adding: ' + this.players.size);
@@ -380,7 +380,7 @@
     //create new player based on config from client
     let player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, Game.enums.WType[playerConfig.lWeapon], Game.enums.WType[playerConfig.rWeapon], Game.enums.WType[playerConfig.skill], playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
     player.playerConfig = playerConfig;
-    player.setBounds(0, 0, this.map.width, this.map.height);
+    player.setBounds(0, 0, this.map.width, this.map.height);//position limits
     //have camera on server side for determining what player can see
     player.camera = new Game.Camera(playerConfig.viewW, playerConfig.viewH);
 
@@ -393,7 +393,7 @@
     //if(debug) console.log('New Player viewW: ' + player.viewW + ' viewH: ' + player.viewH);
     
     //?? should bound be decided here or by spawn function?
-    //put the player onto the actual map within the passed in bounds
+    //put the player onto the actual map within the passed in bounds, return a set of random coor
     let spawnPos = this.spawnObject(player, 100, 100, this.map.width - 100, this.map.height - 100);
       
     if(debug) console.assert(player.pID !== undefined);
@@ -497,29 +497,35 @@
     const subGridY = player.camera.subGridY;
     const subGridXMax = player.camera.subGridXMax;
     const subGridYMax = player.camera.subGridYMax;
-    const drawn = [];//only drawn players
+    const drawn = [];//players already in update
 
     //if(debug) console.log(`update visibles: subGridX: ${subGridX} subGridY: ${subGridY} subGridXMax: ${subGridXMax} subGridYMax: ${subGridYMax} `);
 
-    //iterating occupied graphic grid to get relevant obstacles to draw
+    //can always see self if alive
+    if(player.state === Game.enums.PState.active) update.players.push(player);
+    
+    //iterating occupied graphic grid
     for(let i = subGridX; i < subGridXMax; i++){
       for(let j = subGridY; j < subGridYMax; j++){
         //if(debug && grid[i][j][gList].length > 0) console.log(`draw obstacles gridg[i][j] length: ${grid[i][j][gList].length} i: ${i} j: ${j} subgirdX: ${subGridX} subgridy: ${subGridY} subgirdXmax: ${subGridXMax} subgridymax: ${subGridYMax} `);
 
         if(debug && (!grid[i] || !grid[i][j])) console.log(`update visibles broke: grid: i: ${i} j: ${j}`);
+       
+        //entities
         grid[i][j][Game.enums.GList.entity].forEach(obj => {
-          //todo. ?? right now there are only players. but how should AIs be classified?
           if(debug) console.assert(obj.pID !== undefined);
           if(drawn[obj.pID]) return;//if already in update
-          //if obj is not hiding in the same place as this, return
-          if(obj.zones.has(Game.enums.ZType.hiding) && obj.zones.get(Game.enums.ZType.hiding) !== player.zones.get(Game.enums.ZType.hiding)){
-            //if(debug) console.log(`updatevisibles: can't see due to hiding: pID: ${obj.pID} zID: ${obj.zones.get(Game.enums.ZType.hiding)}`);
-            return;
-          } 
+
+          //if obj is not self and is not hiding in the same place as this or is in stealth
+          if(obj.pID === player.pID ||
+            (obj.zones.has(Game.enums.ZType.hiding) && obj.zones.get(Game.enums.ZType.hiding) !== player.zones.get(Game.enums.ZType.hiding)) || 
+            (obj.tokens.has(Game.enums.Token.stealth))) return;
           
           update.players.push(obj);
           drawn[obj.pID] = true;
         });
+
+        //fires
         grid[i][j][Game.enums.GList.fire].forEach(obj => {
           if(debug) console.assert(obj.fID !== undefined);
           if(player.visibleFires.has(obj.fID)) return;//if already updated
@@ -647,7 +653,7 @@
    * which happens in same sequence on server and client
    */
 
-  //generate map based on a seed. create all the obstacles etc. but not AI
+  //generate map based on a seed. create all the obstacles etc. but not AI. 
   game_core.prototype.generateMap = function (seed){
 
     const generator = new MersenneTwister(seed);//pseudorandom number
@@ -682,6 +688,7 @@
       [0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
       [20, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
     ];
+    /*no under for now
     let templatesUnder = [//under ground not implemented right now. todo. just make them special houses?
       [0, 80, 80, 540, 440, 360, 360, Game.enums.OType.entrance],
       [0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],
@@ -689,9 +696,10 @@
       [0, 100, 400, 100, width - 100, 100, height - 100, Game.enums.OType.house],
       [0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
     ];
+    */
 
     let tooManyCollideCounterUpper = 0;
-    let tooManyCollideCounterUnder = 0;
+    //let tooManyCollideCounterUnder = 0;
     templatesUpper.forEach((template) => {
       let count = template[0];
       template.splice(0, 1);//take out count when passing in to obstacle constructor
@@ -699,6 +707,7 @@
         tooManyCollideCounterUpper += this.addObstacle(undefined, ...template, true, generator, 0);//find a place for it on map then create obstacle
       } 
     });
+    /*
     templatesUnder.forEach((template) => {
       let count = template[0];
       template.splice(0, 1);//take out count when passing in to obstacle constructor
@@ -706,8 +715,9 @@
         tooManyCollideCounterUnder += this.addObstacle(undefined, ...template, false, generator, 0);//find a place for it on map then create obstacle
       } 
     });
+    */
 
-    if(debug) console.log(`generateMap: instances of too many failed fittings: upper: ${tooManyCollideCounterUpper} under: ${tooManyCollideCounterUnder} obstacles count: ${this.obstacles.size}`);
+    if(debug) console.log(`generateMap: instances of too many failed fittings: ${tooManyCollideCounterUpper} obstacles count: ${this.obstacles.size}`);
   }
   //add one complex(specific arrangements of obstacles) based on passed in template and pseudorandom num generator, also make sure no collides
   game_core.prototype.addComplex = function(angle, xMin, xMax, yMin, yMax, cType, upperGround, generator, count){
@@ -1024,8 +1034,8 @@
     //?? after a while of continuous firing two weapons equilibrate to the same beat, cuz of round off?
 
     //?? optimize. all these functions loop over all players. anyway to combine into one loop?
-    this.server_update_graphics();//has to be in rhythm with update broadcast
     this.server_update_stats();//optimize. stats, zones update and broadcast can be on slower loop
+    this.server_update_graphics();//has to be in rhythm with update broadcast
 
       //Update the state of our local clock to match the timer
       //necessary ??
@@ -1049,6 +1059,7 @@
       //add the updates of players, including self despite 'oth' variable name
       visibles.players.forEach((oth) => {
         if(debug) console.assert(oth.state === Game.enums.PState.active);
+        //if(oth.state !== Game.enums.PState.active) console.log(`server_update: oth is not active: self pid: ${player.pID} state: ${player.state} oth pid:${oth.pID} state: ${oth.state}`);
         
         update += oth.x + ',' + oth.y + ',' + oth.angle.fixed(3) + ',' + oth.pID + ',' + oth.lWeapon.spriteIndex + ',' + oth.rWeapon.spriteIndex + ',' + oth.skill.spriteIndex + ',' + oth.health + '+';
         oth.addedTokens.forEach(token => {
@@ -1737,9 +1748,6 @@
     for(let i = 0, l = this.currentPlayers.length; i < l; i++){
       const player = this.currentPlayers[i];
 
-      //apply changes to graphics based on zType
-      if(player.zones.has(Game.enums.ZType.hiding)) player.transparency = 0.6;
-      
       player.draw(ctx, xView, yView, scale);
       
     }

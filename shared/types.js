@@ -35,9 +35,9 @@ Game.enums = {
   GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
   
   //Tool
-  WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'teleport': 8, 'heal': 9, 'invincible': 10, 'stealth': 11, 'relocate': 12}),
-  EType: Object.freeze({'invincible': 0, 'bleed': 1, 'heal': 2, 'entrance': 3, 'bush': 4, 'box': 5}),
-  Token: Object.freeze({'invincible': 0}),
+  WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'teleport': 8, 'heal': 9, 'invincible': 10, 'stealth': 11, 'relocate': 12, 'snipeShot': 13}),
+  EType: Object.freeze({'invincible': 0, 'bleed': 1, 'heal': 2, 'entrance': 3, 'stealth': 4, 'box': 5}),
+  Token: Object.freeze({'invincible': 0, 'stealth': 1, 'hide': 2}),
 
   //Land
   OType: Object.freeze({'tree': 0, 'rock': 1, 'house': 2, 'entrance': 3, 'bush': 4, 'box': 5}),
@@ -85,7 +85,6 @@ Game.enums = {
     this.gList;//which list in each gridg cell to occupy to optimize grid iteration
 
     this.color = 'rgb(153, 0, 0)';//default color is maroon
-    this.transparency;//default to no special transparency
     
     this.upperGround;//externally assigned
     /** 
@@ -439,18 +438,12 @@ Game.enums = {
     const y = Math.round((this.y - yView) * scale);
     const radius = Math.round(this.radius * scale);
 
-    //simply drawing circle does not require turning
-    context.save();
     context.fillStyle = this.color;
-    if(this.transparency !== undefined) context.globalAlpha = this.transparency;
-
     context.beginPath();
 		// convert player world's position to canvas position			
     context.arc(x, y, radius, 0, 2 * PI);
     context.fill();
     context.closePath();
-    context.restore();
-    this.transparency = undefined;//revert to default
 
     //if(debug) console.log(`circle draw: x: ${x} y: ${y}`);
   }
@@ -776,7 +769,8 @@ Game.enums = {
     if(setZone) this.zones.set(obj.zType, obj.zID);
   }
 
-  //TODO, need map info for spawn (boundary etc.), or let caller do it?
+  //optimize. not really necessary if location is decided by coor
+  //?? need map info for random spawn (boundary etc.), or let caller do it?
   Character.prototype.spawn = function(x, y){
     this.x = x;
     this.y = y;
@@ -791,8 +785,8 @@ Game.enums = {
     context.translate(this.x-xView, this.y - yView); //convert player position to canvas postiion
     context.rotate(angle - PI/2);//to compensate for vertical weapon sprites, tweek the angle when drawing.
 
-    //if in a bush etc. optimize. inefficient to assign and assign back each time?
-    if(this.transparency !== undefined) context.globalAlpha = this.transparency;
+    //if in a bush etc. 
+    if(this.zones.has(Game.enums.ZType.hiding) || this.tokens.has(Game.enums.Token.stealth)) context.globalAlpha = 0.6;
 
     //draw weapons
     this.lWeapon.draw(context); 
@@ -814,7 +808,6 @@ Game.enums = {
     });
     
     context.restore();
-    this.transparency = undefined;//revert back to default
   }
   
   //?? awkward method. where should animation be updated?
@@ -837,11 +830,11 @@ Game.enums = {
     } 
     else this.tokens.set(token, count + 1);
   }
-  Character.prototype.server_removeToken = function(token){
+  Character.prototype.server_removeToken = function(token, removeAll){
     const count = this.tokens.get(token);
-    if(debug) console.assert(count);//got to be at least one left
-
-    if(count === 1){//if only one left delete the entire thing
+    if(debug) console.assert(count);
+    
+    if(count === 1 || removeAll){//if only one left delete the entire thing or all overlaps are to be removed
       this.tokens.delete(token);
       this.removedTokens.push(token);
     }

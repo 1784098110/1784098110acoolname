@@ -835,9 +835,10 @@
     switch(this.oType){
       case(Game.enums.OType.bush):
       //if(debug) console.log(`obstacle draw: bush toggled: oID: ${this.oID}`);
-      let part = this.parts.get(Game.enums.OPType.bush);
-      part.transparency = 0.5;//when bush toggles it becomes semi transparent
-      part.draw(context, xView, yView, scale);
+      context.save();//?? optimize. another pair of save and restore inefficient?
+      context.globalAlpha = 0.5;//when bush toggles it becomes semi transparent
+      this.parts.forEach(part => part.draw(context, xView, yView, scale));
+      context.restore();
       return;
 
       default:
