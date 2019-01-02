@@ -111,6 +111,19 @@
       this.onTravelEnd = this.onTeleportTravelEnd;
       break;
 
+      case(Game.enums.WType.snipeShot):
+      this.dmg = 20;
+      this.range = 1200;
+      this.speed = 2500;
+      this.shape = Game.enums.Shape.point;
+      this.radius = 6;
+      this.traveled = traveled || 0;
+      this.hitOnce = true;
+      this.hurtOnce = true;
+      this.color = 'aqua';//testing. should have sprite for bullets
+      this.update = this.shootUpdate;
+      break;
+
       default:
       if(debug) console.log(` ::ERROR:: fire construct no matching wType: ${wType}`);
 

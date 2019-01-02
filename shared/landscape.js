@@ -41,8 +41,8 @@
 
     //graphics
     //todo. these should be decided based on map type
-    this.upperBackColor = 'rgb(160, 160, 160)';
-    this.upperOutColor = 'rgb(140, 140, 140)'
+    this.upperBackColor = '#d6d0b9';
+    this.upperOutColor = '#b3bedc';
     this.upperLineColor = 'white';
     this.underBackColor = 'rgb(30, 30, 30)';
     this.underOutColor = 'black';
@@ -908,7 +908,7 @@
     let radius = this.radius;
 
     let rock = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.3);
-    rock.color = 'pink';
+    rock.color = '#eb5470';
     rock.opType = Game.enums.OPType.rock;
 
     this.parts.set(rock.opType, rock);
@@ -1117,7 +1117,7 @@
 
     this.zones.forEach(zone => {
       zone.upperGround = this.upperGround;
-      zone.color = 'aqua';//testing
+      zone.color = '#00bfff';//testing
       zone.zType = Game.enums.ZType.water;
       zone.gList = Game.enums.GList.zone;
 

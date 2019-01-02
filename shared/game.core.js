@@ -1780,6 +1780,7 @@
     /**
      * todotodo.
      * more skills
+     * rectangles can overlap with rocks. due to rotation? but in real game won't have rotation right
      * 
      */
     /**
