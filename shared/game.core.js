@@ -1050,7 +1050,18 @@
       visibles.players.forEach((oth) => {
         if(debug) console.assert(oth.state === Game.enums.PState.active);
         
-        update += oth.x + ',' + oth.y + ',' + oth.angle.fixed(3) + ',' + oth.pID + ',' + oth.lWeapon.spriteIndex + ',' + oth.rWeapon.spriteIndex + ',' + oth.skill.spriteIndex + ',' + oth.health + ';';
+        update += oth.x + ',' + oth.y + ',' + oth.angle.fixed(3) + ',' + oth.pID + ',' + oth.lWeapon.spriteIndex + ',' + oth.rWeapon.spriteIndex + ',' + oth.skill.spriteIndex + ',' + oth.health + '+';
+        oth.addedTokens.forEach(token => {
+          update += `${token},`;
+        });
+
+        update += '+';
+
+        oth.removedTokens.forEach(token => {
+          update += `${token},`;
+        });
+
+        update += ';';
       });
 
       update += ':';
@@ -1081,11 +1092,16 @@
 
       //if(debug) console.log('server update sent: ' + update);
       player.instance.send(update);
-
       //if(debug) console.log(`server update: ${update}`);
     });
     //refresh objects to remove list
     this.updatedObjects = [];
+
+    //clear up token lists of each player. optimize. ?? anyway to prevent additional loop?
+    this.players.forEach(player => {
+      player.addedTokens = [];
+      player.removedTokens = [];
+    });
   
   }; //game_core.server_update
   
@@ -1424,8 +1440,10 @@
 
   //PLAYER: parse individual player portion of regular server update(as ws message)
   game_core.prototype.client_parseServerPlayerUpdate = function(data){
+    
+    let parts = data.split('+');
 
-    let commands = data.split(',');
+    let commands = parts[0].split(',');
     let update = {};
     update.x = parseInt(commands[0], 10);
     update.y = parseInt(commands[1], 10);
@@ -1438,11 +1456,25 @@
     update.lWeaponSpriteIndex = parseInt(commands[4], 10);
     update.rWeaponSpriteIndex = parseInt(commands[5], 10);
     update.skillSpriteIndex = parseInt(commands[6], 10);
-
     //stats. todo. this should be on a separate slower update loop
     update.health = parseInt(commands[7], 10);
-  
+
+    //added tokens 
+    update.addedTokens = [];
+    const addedTokens = parts[1].split(',');
+    for(let i = 0, l = addedTokens.length - 1; i < l; i++){
+      update.addedTokens.push(parseInt(addedTokens[i], 10));
+    }
+
+    //removed tokens 
+    update.removedTokens = [];
+    const removedTokens = parts[2].split(',');
+    for(let i = 0, l = removedTokens.length - 1; i < l; i++){
+      update.removedTokens.push(parseInt(removedTokens[i], 10));
+    }
+
     //if(debug) console.log('client ParsePlayerUpdate: pID: ' + update.pID + ' angle: ' + update.angle);
+    if(debug && addedTokens.length > 1) console.log(data);
 
     return update;
   }

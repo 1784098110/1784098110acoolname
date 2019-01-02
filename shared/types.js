@@ -649,7 +649,7 @@ Game.enums = {
 //Character
 (function(){
   function Character(health, speed, vision, tID, lWeapon, rWeapon, skill, color, name){
-    Game.Circle.call(this, 25, 0, 0, 0, false, shield);
+    Game.Circle.call(this, 25, 0, 0, 0, false, 0);//0 shield for now, add later on initcombatstats
 
     this.tID = tID;
     this.gList = Game.enums.GList.entity;
@@ -677,6 +677,9 @@ Game.enums = {
     this.zones = new Map();//zID for each type of occupied zone.
     this.effects = [];//buffs etc. update and terminate themselves
     this.tokens = new Map();//markers. todo. no need for map just set?
+    //for server only to inform clients of token change
+    this.addedTokens = [];
+    this.removedTokens = [];
 
     this.initCombatStats();
 
@@ -694,10 +697,10 @@ Game.enums = {
     //if(debug) console.log('Character updateStats: health before update: ' + this.health);
     
     //process effects
-    this.effects.forEach(effect => {
-      effect.update();
-      if(effect.terminate) 
-    });
+    for(let i = this.effects.length - 1; i >= 0; i--){
+      //if return true means terminate
+      if(this.effects[i].update()) this.effects.splice(i, 1);
+    }
 
     //pass dmg processing if invincible
     if(!this.tokens.has(Game.enums.Token.invincible)){//optimize. inefficient to check map each time?
@@ -715,7 +718,6 @@ Game.enums = {
         }
       }
     }
-    else if(debug) console.log(`invincible!`);
     
     this.dmgs = [];  
   }
@@ -792,6 +794,7 @@ Game.enums = {
     //if in a bush etc. optimize. inefficient to assign and assign back each time?
     if(this.transparency !== undefined) context.globalAlpha = this.transparency;
 
+    //draw weapons
     this.lWeapon.draw(context); 
     this.rWeapon.draw(context);
 
@@ -802,9 +805,11 @@ Game.enums = {
     context.fill();
     context.closePath();
 
+    //draw skill
     this.skill.draw(context);
+
+    //draw token related graphics
     this.tokens.forEach((value, token) => {
-      if(debug) console.log(`token draw`);
       this.drawToken(context, token, value);
     });
     
@@ -819,6 +824,45 @@ Game.enums = {
     this.rWeapon.updateGraphics();
     this.skill.updateGraphics();
   }   
+
+  //add and remove token are server only. client directly changes map
+  Character.prototype.server_addToken = function(token){
+    //need to account for token overlap, can't let an early one delete all of them together, so keep track of overlap count
+    const count = this.tokens.get(token);
+
+    //if don't have any inform clients, else increase overlap count
+    if(!count){
+      this.tokens.set(token, 1);
+      this.addedTokens.push(token);
+    } 
+    else this.tokens.set(token, count + 1);
+  }
+  Character.prototype.server_removeToken = function(token){
+    const count = this.tokens.get(token);
+    if(debug) console.assert(count);//got to be at least one left
+
+    if(count === 1){//if only one left delete the entire thing
+      this.tokens.delete(token);
+      this.removedTokens.push(token);
+    }
+    else this.tokens.set(token, count - 1);//else reduce overlap by one
+    
+  }
+  //draw corresponding visual effect of a token on character
+  Character.prototype.drawToken = function(context, token, value){
+    //token is enum number ?? is value necessary?
+    switch(token){
+      case(Game.enums.Token.invincible):
+      //if(debug) console.log(`character draw token: ${token}`);
+      context.beginPath();
+      context.strokeStyle = 'rgb(255, 215, 0)';
+      context.lineWidth = 3;
+      context.arc(0, 0, this.radius, 0, 2 * PI);
+      context.stroke();
+      break;
+      
+    }
+  }
 
   Game.Character = Character;
 })();
@@ -951,6 +995,15 @@ Game.enums = {
     this.skill.spriteIndex = update.skillSpriteIndex;
 
     this.health = update.health;
+
+    //client add or remove token is completely decided by server
+    update.addedTokens.forEach(token => {
+      if(debug) console.assert(Number.isInteger(token));
+      this.tokens.set(token, 1);
+    });
+    update.removedTokens.forEach(token => {
+      this.tokens.delete(token);
+    });
   }
 
 
