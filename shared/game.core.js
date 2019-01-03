@@ -1774,8 +1774,8 @@
     
     /**
      * todotodo.
+     * 
      * hold and release. 
-     * slight inprecision in shooting
      * mines
      * lasers
      * grabbers
