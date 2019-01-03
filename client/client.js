@@ -87,7 +87,7 @@ function handleConfigs(e){
 //?? best way to handle sprite fetching?
 function fetchSprites() {
 
-	let sprites = ['dagger', 'katana'];//each are sprite sheets 
+	let sprites = ['dagger', 'broadsword'];//each are sprite sheets 
 
 	//todo right now is fetching one by one, fetch by pack?? fetch as one image?
 	for(let i = 0, l = sprites.length; i<l; i++){
@@ -132,18 +132,21 @@ function updateCombatStatsDisplay(e){
 	let shield = 0;
 	let vision = 1;
 
-	let lWeaponType = Game.enums.WType[form.elements['lWeapon'].value];
-	let rWeaponType = Game.enums.WType[form.elements['rWeapon'].value];
+	let lWType = Game.enums.WType[form.elements['lWeapon'].value];
+	let rWType = Game.enums.WType[form.elements['rWeapon'].value];
 
-	//change speed
-	speed -= helpers.getWeaponWeight(lWeaponType);
-	speed -= helpers.getWeaponWeight(rWeaponType);
+	const lWeapon = helpers.getCombatStats(lWType);
+    const rWeapon = helpers.getCombatStats(rWType);
+
+    //speed change
+    speed -= lWeapon.weight;
+	speed -= rWeapon.weight;
 	document.querySelector('#combatStats #speed').innerHTML = speed;
 
-	//change shield
-	shield += helpers.getWeaponShield(lWeaponType);
-	shield += helpers.getWeaponShield(rWeaponType);
-	document.querySelector('#combatStats #shield').innerHTML = shield;
+    //shield change
+    shield += lWeapon.shield;
+	shield += rWeapon.shield;
+	document.querySelector('#combatStats #shield').innerHTML = shield.toFixed(2);
 	
 	//if(debug) console.log('updateCombatStatsDisplay: lWeaponType: ' + lWeaponType + ' rWeaponType: ' + rWeaponType + ' speed: ' + speed + ' shield: ' + shield + ' vision: ' + vision );
 }

@@ -35,7 +35,7 @@ Game.enums = {
   GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
   
   //Tool
-  WType: Object.freeze({'fist':0, 'katana':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'teleport': 8, 'heal': 9, 'invincible': 10, 'stealth': 11, 'relocate': 12, 'snipeShot': 13}),
+  WType: Object.freeze({'fist':0, 'broadsword':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'teleport': 8, 'heal': 9, 'invincible': 10, 'stealth': 11, 'relocate': 12, 'snipeShot': 13}),
   EType: Object.freeze({'invincible': 0, 'bleed': 1, 'heal': 2, 'entrance': 3, 'stealth': 4, 'box': 5}),
   Token: Object.freeze({'invincible': 0, 'stealth': 1, 'hide': 2}),
 
@@ -718,13 +718,16 @@ Game.enums = {
   //change combat stats based on player config
   Character.prototype.initCombatStats = function(){
 
+    const lWeapon = helpers.getCombatStats(this.lWeapon.wType);
+    const rWeapon = helpers.getCombatStats(this.rWeapon.wType);
+
     //speed changed by carrying weight
-    this.speed -= helpers.getWeaponWeight(this.lWeapon.wType);
-    this.speed -= helpers.getWeaponWeight(this.rWeapon.wType);
+    this.speed -= lWeapon.weight;
+    this.speed -= rWeapon.weight;
 
     //shield changed by weapon types
-    this.shield += helpers.getShieldValue(this.lWeapon);
-    this.shield += helpers.getShieldValue(this.rWeapon);
+    this.shield += lWeapon.shield;
+    this.shield += rWeapon.shield;
   }
 
   Character.prototype.checkZone = function(obj){
@@ -961,13 +964,11 @@ Game.enums = {
     }
     this.vAdd(Math.round(dx), Math.round(dy)); //apply coor change. optimize. rarely used little helper. 
 
-    //change angle. controls mouse coor is based on canvas, add view coor 
-    let xView = this.x - this.viewW/2;
-    let yView = this.y - this.viewH/2;
-    this.faceDirection(controls.mouseX + xView, controls.mouseY + yView); //mouse pos is relative to world
+    //change angle. 
+    this.faceDirection(controls.mouseX, controls.mouseY); //mouse pos is relative to world
 
+    //if(debug) console.log(`player handlecontrols: speed: ${this.speed}`);
     //if(debug && (~~dx || ~~dy)) console.log('player handlecontrols: controls: ~~dx: ' + (~~dx) + ' ~~dy: ' + (~~dy) + ' x: ' + this.x + ' y: ' + this.y);
-
     //if(debug) console.log('player handlecontrols: lClick: ' + controls.lClick + ' rClick: ' + controls.rClick);
     
   }
@@ -980,6 +981,7 @@ Game.enums = {
     //keep it simple for now. stats update should be on another slower loop
     this.x = update.x;
     this.y = update.y;
+    //if(debug && (!update.x || !update.y)) console.log(` ::ERROR:: update coor false: ${update}`);
     
     this.angle = update.angle;
 
@@ -1019,8 +1021,8 @@ Game.enums = {
 		this.height = canvasHeight;
     
     // distance from followed object to border before camera starts move
-    this.xDeadZone = (this.width/2);
-    this.yDeadZone = (this.height/2);
+    this.xDeadZone = Math.round(this.width/2);
+    this.yDeadZone = Math.round(this.height/2);
 
     // position of camera (left-top coordinate). assigned when following
 		this.xView;
@@ -1074,6 +1076,8 @@ Game.enums = {
 
     this.xView = this.followed.x - this.xDeadZone;
     this.yView = this.followed.y - this.yDeadZone;
+
+    if(debug) console.assert(!(this.xView % 1) && !(this.yView % 1));
     
     //update the grid coors of the bounds of the buffer graphics to be drawn
     

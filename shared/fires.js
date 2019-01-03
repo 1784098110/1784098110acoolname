@@ -1,12 +1,10 @@
 (function(){
   //fire constructor assigns fire details based on wtype
-  function Fire(x, y, angle, player, wType, traveled, holdRadius){
+  function Fire(x, y, angle, player, wType, mx, my, traveled, holdRadius){
     
     if(debug) console.assert(player.pID !== undefined);
     Game.Gobject.call(this, x, y, undefined, angle, undefined, undefined, undefined);
 
-    this.wType = wType;
-    this.gList = Game.enums.GList.fire;
 
     /*might or might not have based on type
     this.dmg;
@@ -14,20 +12,33 @@
     this.speed;
     this.traveled;
     this.life;
+
     */
-    //assigned based on type
+    /*assigned based on type
     this.shape;
     this.hitOnce;//if fire disapears after one hit
     this.hurtOnce;//if fire only causes one time damage
+    */
+
+    //only for shoot or instant distant
+    this.mx = mx;
+    this.my = my;
+    this.dx = mx - x;
+    this.dy = my - y;
+    this.dd = Math.sqrt(this.dx * this.dx + this.dy * this.dy);
+
     //for !hurtonce fires
     this.lastDmg;
     this.dmgInterval = 100;//magic number. the interval between successive dmg register
 
     this.fID;//fire id to be assigned by game core after construction. ?? needed on client side for removal? got to be a more elegant way to inform clients of fire removal
     this.player = player;
-    this.pID = this.player.pID;//to know who killed who
-    this.tID = this.player.tID;
-    this.upperGround = this.player.upperGround;
+    this.pID = player.pID;//to know who killed who
+    this.tID = player.tID;
+    this.wType = wType;
+
+    this.gList = Game.enums.GList.fire;
+    this.upperGround = player.upperGround;
     this.viewers = [];//server only. store players who sees the fire for fast removal
     this.hit = [];//pIDs of hit objects for hitonce checking. todo. need more than pIDs.
 
@@ -71,7 +82,7 @@
       this.update = this.closeUpdate;
       break;
 
-      case(Game.enums.WType.katana):
+      case(Game.enums.WType.broadsword):
       this.dmg = 60;
       this.range = 62;
       this.life = 500;
@@ -121,6 +132,19 @@
       this.hitOnce = true;
       this.hurtOnce = true;
       this.color = 'aqua';//testing. should have sprite for bullets
+      this.update = this.shootUpdate;
+      break;
+
+      case(Game.enums.WType.machineGun):
+      this.dmg = 4;
+      this.range = 700;
+      this.speed = 700;
+      this.shape = Game.enums.Shape.point;
+      this.radius = 4;
+      this.traveled = traveled || 0;
+      this.hitOnce = true;
+      this.hurtOnce = true;
+      this.color = 'red';//testing. should have sprite for bullets
       this.update = this.shootUpdate;
       break;
 
@@ -273,15 +297,22 @@
       return;
     }
 
-    let step = (t - this.lastTime) / 1000; //convert to seconds from milliseconds
+    const step = (t - this.lastTime) / 1000; //convert to seconds from milliseconds
     this.lastTime = t;
-    let d = (this.speed * step);
+    const d = (this.speed * step);
+
+    
+    //use target coor to be more precise and fast. 
+    const ratio = d / this.dd;
+    this.x += Math.round(this.dx * ratio);
+    this.y += Math.round(this.dy * ratio);
+    
 
     //if(debug) console.log('fire update: this.traveled: ' + this.traveled + ' range: ' + this.range + ' step: ' + step);
-    //if(debug) console.log('fire update fID: ' + this.fID + ' x: ' + this.x + ' y: ' + this.y);
+    //if(debug) console.log('fire update fID: ' + this.fID + ' x: ' + this.x + ' y: ' + this.y + ` mx: ${this.dx} my: ${this.dy}`);
+    //this.move(this.angle, d, true); 
 
-    this.move(this.angle, d, true);
-    this.traveled += Math.round(d);//traveled is only used for termination so keep it integer. or not??
+    this.traveled += Math.round(d);//traveled is only used for termination so keep it integer
   }  
   Fire.prototype.closeUpdate = function(t){//time: update time in milliseconds
     //if(debug) console.log('FClose update');

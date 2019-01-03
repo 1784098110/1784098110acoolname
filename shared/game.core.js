@@ -618,25 +618,6 @@
     }
   }
 
-  game_core.prototype.parseClientInput = function( msg ) {
-    if(debug) console.assert(typeof msg === 'string');
-
-    let parts = msg.split(',');
-
-    let controls = {};
-    controls.mouseX = parseInt(parts[0], 10);
-    controls.mouseY = parseInt(parts[1], 10);
-    controls.up = parseInt(parts[2], 10);
-    controls.down = parseInt(parts[3], 10);
-    controls.left = parseInt(parts[4], 10);
-    controls.right = parseInt(parts[5], 10);
-    controls.lWeapon = parseInt(parts[6], 10);
-    controls.rWeapon = parseInt(parts[7], 10);
-    controls.skill = parseInt(parts[8], 10);
-    
-    return controls;
-  }
-  
   game_core.prototype.update_physics = function() {
   
     if(this.server) {
@@ -929,7 +910,7 @@
 
     //go through all players
     this.players.forEach((player) => {
-      if(player.state !== Game.enums.PState.active)return;
+      if(player.state !== Game.enums.PState.active) return;
       
       this.map.handleZones(player);
       player.updateStats();
@@ -1080,8 +1061,8 @@
       //add newly visible fires' construction params.
       visibles.newFires.forEach((fire) => {
         
-        update += fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.traveled + ',' + fire.holdRadius + ';';
-        //if(debug) console.log(`server update newFire: ${fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.traveled + ',' + fire.left + ';'}`);
+        update += fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.mx + ',' + fire.my + ',' + fire.traveled + ',' + fire.holdRadius + ';';
+        //if(debug) console.log(`server update newFire: ${fire.wType + ',' + fire.fID + ',' + Math.round(fire.x) + ',' + Math.round(fire.y) + ',' + fire.angle.fixed(3) + ',' + fire.pID + ',' + fire.mx + ',' + fire.my + ',' + fire.traveled + ',' + fire.left + ';'}`);
         
       });
 
@@ -1102,7 +1083,7 @@
       }
 
       //if(debug) console.log('server update sent: ' + update);
-      player.instance.send(update);
+      if(player.instance) player.instance.send(update);//?? check for open each time inefficient?
       //if(debug) console.log(`server update: ${update}`);
     });
     //refresh objects to remove list
@@ -1120,12 +1101,24 @@
   game_core.prototype.handle_server_input = function(pID, input, input_time, input_seq) { //all passed in as original ws message segments 
   
       //Fetch which client this refers to out of the two
-    var player = this.players.get(pID);
-
+    const player = this.players.get(pID);
+    
     if(!player) return; //player might be dead
     //if(debug) console.log('server handle input pID: ' + pID + ' input: ' + input);
     
-    let controls = this.parseClientInput(input);
+    //parse client input
+    let controls = {};
+    let parts = input.split(',');
+    controls.mouseX = parseInt(parts[0], 10) + player.camera.xView;//here convert mx from relative to window to world 
+    controls.mouseY = parseInt(parts[1], 10) + player.camera.yView;
+    controls.up = parseInt(parts[2], 10);
+    controls.down = parseInt(parts[3], 10);
+    controls.left = parseInt(parts[4], 10);
+    controls.right = parseInt(parts[5], 10);
+    controls.lWeapon = parseInt(parts[6], 10);
+    controls.rWeapon = parseInt(parts[7], 10);
+    controls.skill = parseInt(parts[8], 10);
+
     let time = parseFloat(input_time);
     let seq = parseInt(input_seq, 10);
 
@@ -1182,6 +1175,7 @@
   
   */
   
+  //called during client update
   game_core.prototype.client_handle_input = function(){
   
       //This takes input from the client and keeps a record,
@@ -1506,9 +1500,10 @@
     update.y = parseInt(commands[3], 10);
     update.angle= parseFloat(commands[4]);
     update.player = this.players.get(parseInt(commands[5], 10));
-    update.traveled = (commands[6] === 'undefined') ? undefined : parseInt(commands[6], 10);
-    //update.left = (commands[7] === 'undefined') ? undefined : commands[7] === 'true';
-    update.holdRadius = (commands[7] === 'undefined') ? undefined : parseInt(commands[7], 10);
+    update.mx = parseInt(commands[6], 10);
+    update.my = parseInt(commands[7], 10);
+    update.traveled = parseInt(commands[8], 10);
+    update.holdRadius = parseInt(commands[9], 10);
 
     if(debug) console.assert(update.player);
     //if(debug) {console.log('fire update obj: '); console.log(update);}
@@ -1536,7 +1531,7 @@
   game_core.prototype.client_addFire = function(instance){
     let fire;
 
-    fire = new Game.Fire(instance.x, instance.y, instance.angle, instance.player, instance.wType, instance.traveled, instance.holdRadius);
+    fire = new Game.Fire(instance.x, instance.y, instance.angle, instance.player, instance.wType, instance.mx, instance.my, instance.traveled, instance.holdRadius);
 
     fire.fID = instance.fID;
 
@@ -1779,8 +1774,13 @@
     
     /**
      * todotodo.
-     * more skills
-     * rectangles can overlap with rocks. due to rotation? but in real game won't have rotation right
+     * hold and release. 
+     * slight inprecision in shooting
+     * mines
+     * lasers
+     * grabbers
+     * instant distant
+     * projectile
      * 
      */
     /**
@@ -1798,7 +1798,7 @@
      *  but would it increase client performance since no need to iterate graphic grid?
      * Since fires and entites to draw are dictated by servers should they just not be in graphic grid on client side?
      * Does big index affect performance? how to utilize typed arrays?
-     * 
+     * Rectangles can overlap with rocks. due to rotation? but in real game won't have rotation right
      */
     
     const obstacles = this.obstacles;

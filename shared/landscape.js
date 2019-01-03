@@ -373,17 +373,20 @@
     this.addObject(obj);
   }
   Land.prototype.handleZones = function(obj){//only characters should be passed in 
+    if(debug) console.assert(obj.name);
 
     obj.zones.clear();//?? better way to turn off zone flags to know when obj get out of zone?
 
     let grid = (obj.upperGround === true) ? this.zoneGridUpper : this.zoneGridUnder;
+
+    //if(debug) console.log(`handlezones obj coor: x: ${obj.x} y: ${obj.y}`);
 
     //obj's grid coor
     let x = Math.floor(obj.x / this.cellSize);
     let y = Math.floor(obj.y / this.cellSize);
 
     //potential occupying zones
-    if(debug && !grid[x][y]) console.log(` ::ERROR:: handlezones grid out of bound: x: ${x} y: ${y}`); 
+    if(debug && (!grid[x] || !grid[x][y])) console.log(` ::ERROR:: handlezones grid out of bound: x: ${x} y: ${y}`); 
     let zones = grid[x][y];
     let lastCheck = [];
 

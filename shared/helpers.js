@@ -194,40 +194,39 @@ window.helpers = {};
 
     console.log('Test result: time1: ' + time1 + ' trueCount1: ' + trueCount1 + ' time2: ' + time2 + ' trueCount2: ' + trueCount2);
   }
-  //get changes to character shield value from tool type
-  helpers.getShieldValue = function(tool){
+  //get changes to character combat stats from tool type
+  helpers.getCombatStats = function(wType){
+    const stats = {};
 
-    let shield = 0;
-
-    if(tool.wType !== undefined){//if tool is a weapon
-      shield = helpers.getWeaponShield(tool.wType);
-    }
-
-    return shield    
-  }
-  helpers.getWeaponWeight = function(wType){
     switch(wType){
       case(Game.enums.WType.fist):
-      return 0;
+      stats.weight = 0;
+      stats.shield = 0;
+      break;
 
       case(Game.enums.WType.dagger):
-      return 5;
+      stats.weight = 5;
+      stats.shield = 0;
+      break;
 
-      case(Game.enums.WType.katana):
-      return 15;
-    }
-  }
-  helpers.getWeaponShield = function(wType){
-    switch(wType){
-      case(Game.enums.WType.fist):
-      return 0;
-      
-      case(Game.enums.WType.dagger):
-      return 0;
+      case(Game.enums.WType.broadsword):
+      stats.weight = 15;
+      stats.shield = 0.2;//todo. shield too small gets rounded and means nothing
+      break;
 
-      case(Game.enums.WType.katana):
-      return 0.1;
+      case(Game.enums.WType.machineGun):
+      stats.weight = 20;
+      stats.shield = 0.1;
+      break;
+
+      default:
+      if(debug) console.log(` ::ERROR:: helpers get weight: no matching wType: ${wType}`);
+      stats.weight = 0;
+      stats.shield = 0;
+      break;
     }
+
+    return stats;
   }
 
 })();

@@ -28,7 +28,15 @@
       this.fire = this.shootFire;
       break;
 
-      case(Game.enums.WType.katana):
+      case(Game.enums.WType.machineGun):
+      this.cool = 100;
+      this.length = 20;
+      this.holdRadius = 18;
+      this.addGraphic(Game.sprites[this.wType], 0, 0, 0);
+      this.fire = this.shootFire;
+      break;
+
+      case(Game.enums.WType.broadsword):
       this.spriteCount = 8;
       this.cool = 1000;
       this.holdRadius = 15;
@@ -195,7 +203,7 @@
     //if(debug) console.log(`shootFire: x1:${x1} y1:${y1} angle:${angle} x:${x} y:${y} wType:${this.wType} left:${this.left}`);
     //if(debug) console.log('Weapon Fire: left: ' + this.left + ' holdRadius: ' + this.holdRadius + ' height: ' + this.length + ' r: ' + r + ' angle1: ' + angle1 + ' angle2: ' + angle2 + ' x1: ' + x1 + ' y1: ' + y1 + ' x: ' + x + ' y: ' + y);
     
-    game.server_addFire(new Game.Fire(x, y, angle, this.player, this.wType, 0, undefined, undefined));
+    game.server_addFire(new Game.Fire(x, y, angle, this.player, this.wType, mx, my, undefined, undefined));
   }
   Tool.prototype.closeFire = function(game, mx, my){
 
@@ -209,7 +217,7 @@
 
     //if(debug) console.log(`closeFire: x1:${x1} y1:${y1} angle:${angle} x:${x} y:${y} wType:${this.wType} left:${this.left}`);
 
-    game.server_addFire(new Game.Fire(x, y, angle, this.player, this.wType, undefined, this.holdRadius));
+    game.server_addFire(new Game.Fire(x, y, angle, this.player, this.wType, undefined, undefined, undefined, this.holdRadius));
   }
   Tool.prototype.healFire = function(game, mx, my){
 
