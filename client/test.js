@@ -12,6 +12,7 @@ let app = new PIXI.Application({
 );
 app.renderer.autoResize = true;
 app.renderer.resize(window.innerWidth, window.innerHeight);
+app.renderer.backgroundColor = 0x000000;
 console.log(`app view size: ${app.view.width} ${app.view.height}`);
 
 //load an image and run the `setup` function when it's done

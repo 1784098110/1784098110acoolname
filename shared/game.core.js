@@ -495,7 +495,7 @@
 		const subGridY = player.camera.subGridY;
 		const subGridXMax = player.camera.subGridXMax;
 		const subGridYMax = player.camera.subGridYMax;
-		const drawn = [];//players already in update
+		const rID = Game.rIDCounter++;//players already in update
 
 		//if(debug) console.log(`update visibles: subGridX: ${subGridX} subGridY: ${subGridY} subGridXMax: ${subGridXMax} subGridYMax: ${subGridYMax} `);
 
@@ -512,7 +512,7 @@
 				//entities
 				grid[i][j][Game.enums.GList.entity].forEach(obj => {
 					if(debug) console.assert(obj.pID !== undefined);
-					if(drawn[obj.pID]) return;//if already in update
+					if(obj.rID === rID) return;//if already in update
 
 					//if obj is not self and is not hiding in the same place as this or is in stealth
 					if(obj.pID === player.pID ||
@@ -520,7 +520,7 @@
 						(obj.tokens.has(Game.enums.Token.stealth))) return;
 					
 					update.players.push(obj);
-					drawn[obj.pID] = true;
+					obj.rID = rID;
 				});
 
 				//fires
@@ -1801,7 +1801,7 @@
 		
 		const obstacles = this.obstacles;
 		const grid = this.self.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
-		const drawn = [];
+		const rID = Game.rIDCounter++;
 
 		//iterating occupied graphic grid to get relevant obstacles to draw
 		for(let g = Game.enums.GList.obstacle; g <= Game.enums.GList.treeCrown; g++){
@@ -1811,14 +1811,14 @@
 					if(debug && (!grid[i] || !grid[i][j])) console.log(`drawObstacles broke: grid: i: ${i} j: ${j}`);
 					grid[i][j][g].forEach(obj => {
 						if(debug) console.assert(obj.oID !== undefined);
-						if(drawn[obj.oID]) return;//if already drawn
+						if(obj.rID === rID) return;//if already drawn
 
 						//some obstacles have different graphics under certain situations
 						let toggle = false;//optimize. don't need to store it
 						if(this.gtoggledObstacles.has(obj.oID)) toggle = true;
 
 						obstacles.get(obj.oID).draw(context, xView, yView, scale, toggle);
-						drawn[obj.oID] = true;
+						obj.rID = rID;
 					});
 				}
 			}

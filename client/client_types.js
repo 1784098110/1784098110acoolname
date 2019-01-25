@@ -21,8 +21,8 @@ window.Game = {
   enums:{}, 
   Weapons: {}, 
   Textures: {},
-  rIDCounter: 0,//process id
-};//textures are client only
+  rIDCounter = 0,//process id
+};
 
 /*todo. how to handle code sharing for these js files? (below is game_core example)
 //server side we set the 'game_core' class to a global type, so that it can use it anywhere.
@@ -39,7 +39,6 @@ Game.enums = {
 	Shape: Object.freeze({'custom': 0, 'rectangle':1, 'circle':2, 'line':3, 'point':4}),
 	PState: Object.freeze({'dead':0, 'active':1, 'spectate':2, 'protect':3}),
 	GOver: Object.freeze({'death': 0, 'teamWin': 1, 'teamLose': 2, 'playerWin': 3, 'playerLost':4}),
-	GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
 	
 	//Tool
 	WType: Object.freeze({'fist':0, 'broadsword':1, 'dagger':2, 'machineGun':3, 'sniper':4, 'launcher':5, 'mine':6, 'fireball': 7, 'teleport': 8, 'heal': 9, 'invincible': 10, 'stealth': 11, 'relocate': 12, 'snipeShot': 13}),
@@ -53,6 +52,10 @@ Game.enums = {
 	TType: Object.freeze({'river': 0, 'dessert': 1, 'swamp': 2, 'beach': 3}),
 	ZType: Object.freeze({'plain': 0, 'water': 1, 'dessert': 2, 'snow': 3, 'entrance': 4, 'hiding': 5}),
 
+	//Graphics
+	GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
+	CIndex: Object.freeze({'zones': 0, 'lines': 1, 'game': 2, 'obstacle': 3, 'treeCrown': 4}),
+
 };
 
 //Gobject
@@ -60,7 +63,7 @@ Game.enums = {
 	function Gobject(x, y, shape, angle, passable, shield, health){
 		
 		//todo this.id = id; //only assign on server side
-    this.rID;//process id. used for uniqueness during draw etc.
+		this.rID;//process id. used for uniqueness during draw etc.
 
 		//coordinate relative to world not canvas
 		this.x = x;
@@ -93,12 +96,12 @@ Game.enums = {
 		this.gList;//which list in each gridg cell to occupy to optimize grid iteration
 
 		this.color = 'rgb(153, 0, 0)';//default color is maroon
+		this.sprite;
 		
 		this.upperGround;//externally assigned
 		/** 
 		 * obstacle part or zones only
 		 * this.opType;
-		 * this.sprite;
 		 * this.dx;
 		 * this.dy;
 		 * this.oID;
@@ -1013,108 +1016,3 @@ Game.enums = {
 	Game.Player = Player;
 })();
 
-
-
-//Camera, handles graphics
-(function () {
-	//optimize. x and y view can be calculated with player and canvas stats
-	function Camera(canvas, canvasWidth, canvasHeight) {
-		
-		this.followed;//assigned with follow method
-
-		this.canvas = canvas;
-		this.canvas.width = canvasWidth;
-		this.canvas.height = canvasHeight;
-
-		//client's actual window size. can change  ?? need separate from width and height?
-		this.wView = canvasWidth;
-		this.hView = canvasHeight;
-		this.scale;//scale of graphics to actual size
-
-		// viewport dimensions, on world map not the same as view size
-		this.width = this.wView;
-		this.height = this.hView;
-		
-		// distance from followed object to view border before camera starts move
-		this.xDeadZone = Math.round(this.width/2);
-		this.yDeadZone = Math.round(this.height/2);
-
-		// position of camera (left-top coordinate). assigned when following
-		this.xView;
-		this.yView;
-
-		//bounds of viewport on graphic grid 
-		this.subGridX;
-		this.subGridY;
-		this.subGridXMax;
-		this.subGridYMax;
-
-		//pixijs application
-		this.app = new pixiApplication({view: this.canvas});
-		this.app.renderer.autoResize = true;
-	}
-
-	// gameObject needs to have "x" and "y" properties (as world(or room) position)
-	Camera.prototype.follow = function (player, xDeadZone, yDeadZone) {
-		this.followed = player;
-		this.xDeadZone = xDeadZone || this.xDeadZone;
-		this.yDeadZone = yDeadZone || this.yDeadZone;
-		this.xView = this.followed.x - this.xDeadZone;
-		this.yView = this.followed.y - this.yDeadZone;
-	}
-	/*todo. not used right now. all graphics should not be based on viewport size directly. should scale.
-	Camera.prototype.setViewport = function(width, height) {
-		this.width = width;
-		this.height = height;
-		this.scale = 1;//todo. when clien viewport size changes
-	}*/
-	Camera.prototype.update = function (cellSize, gridW) {//graphic grid cellsize and width
-		// keep following the player (or other desired object)
-		
-		const wView = this.width;
-		const hView = this.height;
-		/*
-		if (this.followed) {
-			var xView = 0,
-					yView = 0;
-			if (this.followed.x - this.xView + this.xDeadZone > this.width)
-				xView = this.followed.x - (this.width - this.xDeadZone);
-			else if (this.followed.x - this.xDeadZone < this.xView)
-				xView = this.followed.x - this.xDeadZone;
-
-			if (this.followed.y - this.yView + this.yDeadZone > this.height)
-				yView = this.followed.y - (this.height - this.yDeadZone);
-			else if (this.followed.y - this.yDeadZone < this.yView)
-				yView = this.followed.y - this.yDeadZone;
-		}*/
-
-		this.xView = this.followed.x - this.xDeadZone;
-		this.yView = this.followed.y - this.yDeadZone;
-
-		if(debug) console.assert(!(this.xView % 1) && !(this.yView % 1));
-		
-		//update the grid coors of the bounds of the buffer graphics to be drawn
-		
-		const xView = this.xView;
-		const yView = this.yView;
-
-		//if(debug && !(xView && yView && wView && hView)) console.log(`camera update: xView: ${xView} yView: ${yView} wView: ${wView} hView: ${hView} `)
-
-		const xViewEnd = xView + wView;
-		const yViewEnd = yView + hView;
-		//have some graphics buffer
-		const subGridX = Math.floor(xView / cellSize) - 1;
-		const subGridY = Math.floor(yView / cellSize) - 1;
-		const subGridXMax = Math.ceil((xViewEnd) / cellSize) + 1;//todo. should scale
-		const subGridYMax = Math.ceil((yViewEnd) / cellSize) + 1;
-		//don't get out of bound
-		this.subGridX = (subGridX < 0) ? 0 : subGridX;
-		this.subGridY = (subGridY < 0) ? 0 : subGridY;
-		this.subGridXMax = (subGridXMax > gridW) ? gridW : subGridXMax;
-		this.subGridYMax = (subGridYMax > gridW) ? gridW : subGridYMax;
-	}
-
-	// add "class" Camera to our Game object
-	Game.Camera = Camera;
-
-})();

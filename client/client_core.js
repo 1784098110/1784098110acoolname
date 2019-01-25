@@ -328,7 +328,7 @@
 		if(debug) console.assert(width && height);
 
 		//terrian goes first and does not check for collision
-		this.map.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
+		this.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
 
 		//complexes, get big ones first
 		//argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, cType 
@@ -442,6 +442,15 @@
 		
 		return 0;
 	}
+
+  game_core.prototype.addTerrian = function(terrian){
+    //todo. Some terrians might be incompatible, might need collide check after all
+    terrian.zones.forEach(zone => {
+      this.map.addZone(zone);
+    });
+    terrian.generator = undefined;
+  }
+
 	//add one obstacle object based on passed in template and pseudorandom num generator, also make sure no collides
 	game_core.prototype.addObstacle = function(angle, minSize, maxSize, xMin, xMax, yMin, yMax, oType, upperGround, generator, count){
 
@@ -845,7 +854,7 @@
 	
 	game_core.prototype.client_update = function() {
 
-		//todo. scale 
+		//todo. scale?
 		const upperGround = this.self.upperGround;
 		const ctx = this.ctx;
 		const xView = this.camera.xView;
@@ -914,13 +923,7 @@
 		/**
 		 * todotodo.
 		 * 
-		 * hold and release. 
-		 * mines
-		 * lasers
-		 * grabbers
-		 * instant distant
-		 * projectile
-		 * 
+		 * incorporate sprite creation to adding stuff
 		 */
 		/**
 		 * ??
@@ -942,7 +945,7 @@
 		
 		const obstacles = this.obstacles;
 		const grid = this.self.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
-		const drawn = [];
+		const rID = Game.rIDCounter++;
 
 		//iterating occupied graphic grid to get relevant obstacles to draw
 		for(let g = Game.enums.GList.obstacle; g <= Game.enums.GList.treeCrown; g++){
@@ -952,14 +955,14 @@
 					if(debug && (!grid[i] || !grid[i][j])) console.log(`drawObstacles broke: grid: i: ${i} j: ${j}`);
 					grid[i][j][g].forEach(obj => {
 						if(debug) console.assert(obj.oID !== undefined);
-						if(drawn[obj.oID]) return;//if already drawn
+						if(obj.rID === rID) return;//if already drawn
 
 						//some obstacles have different graphics under certain situations
 						let toggle = false;//optimize. don't need to store it
 						if(this.gtoggledObstacles.has(obj.oID)) toggle = true;
 
 						obstacles.get(obj.oID).draw(context, xView, yView, scale, toggle);
-						drawn[obj.oID] = true;
+						obj.rID = rID;
 					});
 				}
 			}

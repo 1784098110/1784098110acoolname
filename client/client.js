@@ -3,14 +3,6 @@
 
 window.debug = true;
 
-//Global Aliases
-window.pixiTextureCache = PIXI.utils.TextureCache;
-window.pixiLoader = PIXI.loader;
-window.pixiResources = PIXI.loader.resources;
-window.pixiSprite = PIXI.Sprite;
-
-
-
 //?? closure necessary?
 (function(){
 	
@@ -93,7 +85,7 @@ function handleConfigs(e){
 //?? best way to handle sprite fetching?
 function fetchSprites() {
 
-	let spriteNames = ['dagger', 'broadsword'];
+	let spriteNames = [Game.enums.WType.dagger, Game.enums.WType.broadsword];
 
 	/*todo right now is fetching one by one, fetch by pack?? fetch as one image?
 	for(let i = 0, l = spritesNames.length; i<l; i++){
@@ -125,7 +117,7 @@ function fetchSprites() {
 		return {name: spriteName, url: `sprites/${spriteName}.png`};
 	});
 
-	pixiLoader.add(sprites).load((loader, resources) => {
+	PIXI.loader.add(sprites).load((loader, resources) => {
 		spriteNames.forEach(spriteName => {
 			Game.Textures[spriteName] = resources[spriteName].texture;
 		});

@@ -10,7 +10,7 @@
    * Or are their graphisc prefixed on map with just some stats recorded
    * somewhere to let game know there's an obstacle???
    * */ 
-  function Land(width, height, cellSize) {//testing. better way to inform it's server
+  function Land(width, height, cellSize) {
 		this.width = width; //world not grid size
     this.height = height;
 
@@ -93,17 +93,6 @@
     return this.jidCounter++; 
   
   }
-
-  Land.prototype.addTerrian = function(obj){
-    //todo.add all kinds of terrians before any object/zone. so there's no collide check
-
-    //todo. Some terrians might be incompatible, might need collide check after all
-    obj.zones.forEach(zone => {
-      this.addZone(zone);
-    });
-    obj.generator = undefined;
-
-  }
   //zones are permanent
   Land.prototype.addZone = function(obj){
     //zones can be rotated rectangles
@@ -112,7 +101,7 @@
 
     //add glist here once for all since zones won't be readded
     if(debug) console.assert(obj.gList === Game.enums.GList.zone);
-    const gList = obj.gList
+    const gList = obj.gList;
 
     let grid, gridg;//logic grid has zone and objects separated. but combined in graphic grid
     [grid, gridg] = (obj.upperGround === true) ? [this.zoneGridUpper, this.gridgUpper] : [this.zoneGridUnder, this.gridgUnder];
@@ -581,7 +570,7 @@
     return upperMap; //player map belongs to core
   }
 	// draw the map background adjusted to camera
-	Land.prototype.drawBackground = function (context, xView, yView, wView, hView, scale, upperGround, subGridX, subGridY, subGridXMax, subGridYMax) {
+	Land.prototype.getVisibleZones = function (subGridX, subGridY, subGridXMax, subGridYMax) {
     
     //first paint background color
     context.fillStyle = upperGround ? this.upperBackColor : this.underBackColor;
@@ -734,6 +723,7 @@
       part.yMax = this.yMax;
       part.upperGround = this.upperGround;
       part.angle = this.angle;//optimize. circle already pass in angle at constructions, just pass in angle at other shapes' construct too
+
       if(part.gList === undefined) part.gList = Game.enums.GList.obstacle;//some parts have specially assigned glists
 
       //if obstacle's size changes with health of a certain part
