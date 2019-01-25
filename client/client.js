@@ -3,6 +3,12 @@
 
 window.debug = true;
 
+//Global Aliases
+window.pixiTextureCache = PIXI.utils.TextureCache;
+window.pixiLoader = PIXI.loader;
+window.pixiResources = PIXI.loader.resources;
+window.pixiSprite = PIXI.Sprite;
+
 
 
 //?? closure necessary?
@@ -87,11 +93,11 @@ function handleConfigs(e){
 //?? best way to handle sprite fetching?
 function fetchSprites() {
 
-	let sprites = ['dagger', 'broadsword'];//each are sprite sheets 
+	let spriteNames = ['dagger', 'broadsword'];
 
-	//todo right now is fetching one by one, fetch by pack?? fetch as one image?
-	for(let i = 0, l = sprites.length; i<l; i++){
-		let imageName = sprites[i];
+	/*todo right now is fetching one by one, fetch by pack?? fetch as one image?
+	for(let i = 0, l = spritesNames.length; i<l; i++){
+		let imageName = spriteNames[i];
 
 		Game.sprites[Game.enums.WType[imageName]] =  document.createElement('img');
 
@@ -112,7 +118,43 @@ function fetchSprites() {
 			console.log('Network request for "' + product.name + '" image failed with response ' + response.status + ': ' + response.statusText);
 		}
 		});
-	}
+	}*/	
+
+	//load sprites and store in global object
+	sprites = spriteNames.map(spriteName => {
+		return {name: spriteName, url: `sprites/${spriteName}.png`};
+	});
+
+	pixiLoader.add(sprites).load((loader, resources) => {
+		spriteNames.forEach(spriteName => {
+			Game.Textures[spriteName] = resources[spriteName].texture;
+		});
+
+		if(debug) console.log(`pixiloader finished loading. game textures length: ${Game.Textures.size}`);
+	});
+	/*
+	spriteNames.forEach(spriteName => {
+		const path = `sprites/${spriteName}.png`;
+
+		// Use fetch to fetch the image, and convert the resulting response to a blob
+		// Again, if any errors occur we report them in the console.
+		fetch(path).then(response => {
+			if(response.ok) {
+				response.blob().then(blob => {
+					// Convert the blob to an object URL — this is basically an temporary internal URL
+					// that points to an object stored inside the browser
+					const objectURL = URL.createObjectURL(blob);
+					
+					//when we got the image we load it to texture and make a sprite out of it
+					pixiLoader.add(spriteName, objectURL, () => {
+						Game.sprites[Game.enums.WType[spriteName]] = new pixiSprite(pixiResources[spriteName].texture);
+					});
+				});
+			} else {
+				console.log('Network request for "' + product.name + '" image failed with response ' + response.status + ': ' + response.statusText);
+			}
+		});		
+	});*/
 	
 }
 
@@ -161,8 +203,7 @@ function gameOverInterface(msg){
 
 }
 
-	//When loading, we store references to our
-	//drawing canvases, and initiate a game instance.
+	//When loading, we store references to our drawing canvases, and initiate a game instance.
 window.onload = function(){
 	
 		//Create our game client instance without actual game and player info
@@ -173,7 +214,7 @@ window.onload = function(){
 
 	const gameDiv = document.getElementById('game');
 
-	fetchSprites();//start fetching necessary sprites
+	fetchSprites();//start fetching necessary images
 	listenToolChange();//manage dynamic combat stats display
 	updateCombatStatsDisplay();//fit combat stats display to options on load(browser might save config thus combat stats might not be default on load)
 
@@ -242,8 +283,6 @@ window.onload = function(){
 		e.preventDefault();
 		e.stopPropagation();
 		
-		//if(debug) console.log(`mouse pos to map: x: ${game.camera.xView + game.controls.mouseX} y: ${game.camera.yView + game.controls.mouseY} self x: ${game.self.x} y: ${game.self.y} `)
-
 		if(e.button === 0)game.controls.lWeapon = false;
 		else if(e.button === 2)game.controls.rWeapon = false;	
 	}, false);

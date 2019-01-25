@@ -1,0 +1,102 @@
+button::-moz-focus-inner{/*remove firefox clicked button doted line effect*/
+    border:0;
+}
+
+html, body{
+    height:100%;
+    margin: 0px;
+    padding: 0px;
+    overflow: hidden;
+}
+
+#space{
+    height:100%;
+}
+#space.inGame #home{
+    visibility: hidden;
+}
+#space.inGame #game{
+    visibility: visible;
+}
+#space.inGame.gameOver #gameOver{
+    transition-delay: 1s;
+    transition-duration: 2s;
+    visibility: visible;
+    opacity: 1;
+}
+  
+#game{
+    visibility: visible;
+    height: 100%;
+}
+#game #gameCanvas {
+    z-index: 1;
+    position: absolute;
+    display: block;
+    top: 0%;
+    left: 0%;
+    height: 100vh;
+    width: 100vw;
+}
+
+#gameOver{
+    transition-delay: 0s;
+    transition-duration: 0s;
+    z-index: 5;
+    visibility: hidden;
+    height:100%;
+    width:100%;
+    position: absolute;
+    top: 0%;
+    background-color: rgba(0, 0, 0, 0.7);
+    opacity: 0;
+}
+#gameOver #message{
+    font: bold 40px arial;
+    color: white;
+    text-align: center;
+    margin-top: 50px;
+    margin-left: auto;
+    margin-right: auto;
+}
+#gameOver #backButton{
+    border-radius:8px;
+    color: white;
+    text-align: center;
+    display: block;
+    background: #4CAF50;
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 290px;
+    border: none;
+    padding: 8px 44px;
+    text-decoration: none;
+    cursor: pointer;
+    transition-duration: 0.2s;
+}
+#gameOver #backButton:hover{
+    background: rgb(54, 129, 58);
+    color: rgb(218, 216, 216);
+}
+
+
+#home{
+    visibility: inherit;
+    background-color: rgba(255, 255, 255, 0.7); 
+    height:100%;
+    width:100%;
+    position:absolute;
+    top:0%;
+
+}
+#home #config {
+    top:25%;
+    left:40%;
+    position:absolute;
+    text-align: center;
+}
+#home #combatStats {
+    position: absolute;
+    top:25%;
+    left:70%;
+}   
