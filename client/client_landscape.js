@@ -39,6 +39,8 @@
     this.zidCounter = 0;
     this.jidCounter = 0;
 
+    this.camera;
+
     //graphics
     //todo. these should be decided based on map type
     this.upperBackColor = '#d6d0b9';
@@ -108,6 +110,9 @@
 
     obj.zID = this.createZID();//?? but zones are split into two different lists. 
     this.zones.set(obj.zID, obj);
+
+    //addgraphic
+    obj.sprite = this.camera.createSpriteZone(obj);
 
     //if(debug && obj.zType === Game.enums.ZType.hiding) console.log(`addzone: zone: zType: ${obj.zType} zID: ${obj.zID} color: ${obj.color}`);
 

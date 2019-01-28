@@ -42,12 +42,41 @@ function setup(loader, resources) {
 	rec.drawRect(0, 0, 100, 50);
 	rec.endFill();
 
-	app.stage.addChild(rec, cat, cat1, cat2);
+	const container = new PIXI.Container();
+	container.addChild(rec, cat, cat1, cat2);
 	
 	rec.position.set(300, 300);
 	cat.position.set(300, 300);
 	cat1.position.set(100, 100);
 	cat2.position.set(150, 150);
+
+	//app.stage.addChild(container);
+	container.position.set(app.stage.width / 2, app.stage.height / 2);
+	container.scale.set(0.5, 0.5);
+	container.pivot.set(container.width / 2, container.height / 2);
+	container.rotation = Math.PI / 2;
+
+
+	const container1 = new PIXI.Container();
+	const body = new PIXI.Graphics();
+	body.beginFill(0x66CCFF);
+	body.drawCircle(0, 0, 25);
+	body.endFill();
+	const lWeapon = new PIXI.Sprite.from('sprites/longstick.png');
+	const rWeapon = new PIXI.Sprite.from('sprites/medstick.png');
+
+	container1.addChild(lWeapon, rWeapon, body);
+	lWeapon.anchor.set(0.5, 0);
+	rWeapon.anchor.set(0.5, 0);
+	lWeapon.scale.set(0.2);
+	rWeapon.scale.set(0.2);
+	lWeapon.position.set(20, 0);
+	rWeapon.position.set(-20, 0);
+
+	app.stage.addChild(container1);
+	container1.pivot.set(body.x, body.y);
+	//container1.rotation = Math.PI / 3;
+	container1.position.set(500, 200);
 
 	Game.Sprites.rec = rec;
 	Game.Sprites.cat = cat;

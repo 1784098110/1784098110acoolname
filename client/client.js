@@ -83,7 +83,7 @@ function handleConfigs(e){
 }//handleConfigs
 
 //?? best way to handle sprite fetching?
-function fetchSprites() {
+function fetchSprites () {
 
 	let spriteNames = [Game.enums.WType.dagger, Game.enums.WType.broadsword];
 

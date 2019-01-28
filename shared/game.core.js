@@ -1773,6 +1773,8 @@
 		/**
 		 * todotodo.
 		 * 
+		 * make obstacles objects with only one components, all other obstacles count as complexes.
+		 * 
 		 * hold and release. 
 		 * mines
 		 * lasers

@@ -177,6 +177,8 @@
 
 		//init map
 		this.map = new Game.Land(this.instance.width, this.instance.height, this.instance.cellSize);
+    this.map.camera = this.camera;//testing
+    this.camera.setMapInfo(this.map.cellSizeg, this.map.gridWg);
 		
 		this.generateMap(this.instance.mapSeed);
 		//if(debug) console.log(`map generate time: ${Date.now() - start0}`);
@@ -272,6 +274,9 @@
 		const player = new Game.Player(playerConfig.health, playerConfig.speed, playerConfig.vision, playerConfig.pID, playerConfig.tID, Game.enums.WType[playerConfig.lWeapon], Game.enums.WType[playerConfig.rWeapon], Game.enums.WType[playerConfig.skill], playerConfig.color, playerConfig.name, playerConfig.viewW, playerConfig.viewH, this);
 		player.state = Game.enums.PState.active;
 		//if(debug && player.pID === undefined) {console.log(`add undefined pID: playerconfig: `); console.log(playerConfig);}
+
+    //add graphic
+    this.camera.createSpritePlayer(player);
 
 		//self is also in regular players list, but before spawn message self has no pid
 		if(this.self === undefined && player.pID === undefined) {
@@ -451,6 +456,7 @@
     terrian.generator = undefined;
   }
 
+  //todo. systematize functions. add functions do not create
 	//add one obstacle object based on passed in template and pseudorandom num generator, also make sure no collides
 	game_core.prototype.addObstacle = function(angle, minSize, maxSize, xMin, xMax, yMin, yMax, oType, upperGround, generator, count){
 
@@ -503,6 +509,9 @@
 		const oID = this.createOID();
 		const obj = new Game.Obstacle(placeHolder.radius, placeHolder.width, placeHolder.height, x, y, angle, oID, oType, upperGround);
 		
+    //add sprite
+    obj.sprite = this.createSpriteObstacle(obj);
+
 		//add all parts and zones and add to list
 		obj.parts.forEach((part) => {
 			//if(debug) console.log('map addobstacle: part upperGround: ' + part.upperGround);
@@ -846,7 +855,7 @@
 				fire.update(t);
 			});
 
-			this.camera.update(this.map.cellSizeg, this.map.gridWg);//update camera coords right after self update. otherwise coors don't synchronize and jitter happens
+			this.camera.update();//update camera coords right after self update. otherwise coors don't synchronize and jitter happens
 
 	
 	
@@ -942,7 +951,7 @@
 		 * Does big index affect performance? how to utilize typed arrays?
 		 * Rectangles can overlap with rocks. due to rotation? but in real game won't have rotation right
 		 */
-		
+		/*
 		const obstacles = this.obstacles;
 		const grid = this.self.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
 		const rID = Game.rIDCounter++;
@@ -966,7 +975,7 @@
 					});
 				}
 			}
-		}
+		}*/
 
 	}  
 	game_core.prototype.drawPlayerMap = function(context, viewWidth, viewHeight){

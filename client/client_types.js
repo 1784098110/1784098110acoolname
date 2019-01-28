@@ -823,38 +823,7 @@ Game.enums = {
 		
 		context.restore();
 	}
-	
-	//?? awkward method. where should animation be updated?
-	Character.prototype.updateGraphics = function(){
-		//if(debug) console.log(`entity updategraphics`);
-		this.lWeapon.updateGraphics();
-		this.rWeapon.updateGraphics();
-		this.skill.updateGraphics();
-	}   
 
-	//add and remove token are server only. client directly changes map
-	Character.prototype.server_addToken = function(token){
-		//need to account for token overlap, can't let an early one delete all of them together, so keep track of overlap count
-		const count = this.tokens.get(token);
-
-		//if don't have any inform clients, else increase overlap count
-		if(!count){
-			this.tokens.set(token, 1);
-			this.addedTokens.push(token);
-		} 
-		else this.tokens.set(token, count + 1);
-	}
-	Character.prototype.server_removeToken = function(token, removeAll){
-		const count = this.tokens.get(token);
-		if(debug) console.assert(count);
-		
-		if(count === 1 || removeAll){//if only one left delete the entire thing or all overlaps are to be removed
-			this.tokens.delete(token);
-			this.removedTokens.push(token);
-		}
-		else this.tokens.set(token, count - 1);//else reduce overlap by one
-		
-	}
 	//draw corresponding visual effect of a token on character
 	Character.prototype.drawToken = function(context, token, value){
 		//token is enum number ?? is value necessary?
