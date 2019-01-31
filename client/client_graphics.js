@@ -1,6 +1,6 @@
 (function(){
 
-	function Camera(canvas, map, instance){
+	function Camera(canvas){
 
 		this.canvas = canvas;
 		this.canvas.width = window.innerWidth;
@@ -41,7 +41,7 @@
 		this.app.renderer.backgroundColor = this.backgroundColor;
 
 		this.followed;
-		this.map = map;//for later integration into client core
+		//this.map = map;//for later integration into client core
 
 		this.stage = this.app.stage;
 		this.stage.addChild(new PIXI.Container());//zones
@@ -85,26 +85,7 @@
 			gridStage.addChild(line);
 		}
 	}
-	// gameObject needs to have "x" and "y" properties (as world(or room) position)
-	Camera.prototype.follow = function (player) {
-		this.followed = player;
-		this.xView = this.followed.x - this.xDeadZone;
-		this.yView = this.followed.y - this.yDeadZone;
-	}
 
-	//update position on map based on followed and gGrid occupation
-	Camera.prototype.update = function () {//graphic grid cellsize and width
-		// keep following the player (or other desired object)
-
-		//update camera position on map
-		const oldXView = this.xView;
-		const oldYView = this.yView;
-		this.xView = this.followed.x - this.xDeadZone;
-		this.yView = this.followed.y - this.yDeadZone;
-		this.dx = this.xView - oldXView;
-		this.dy = this.yView - oldYView;
-
-	}
 	Camera.prototype.createSpritePlayer = function(player){
 		const container = new PIXI.Container();
 
@@ -127,6 +108,31 @@
 
 		return container;
 
+	}
+	Camera.prototype.createSpriteFire = function(obj){
+		//todo. based on type
+		let sprite;
+		switch(obj.wType){
+			case(Game.enums.WType.katana):
+			sprite = this.createSpriteCirc(obj.color, obj.radius);
+			break;
+
+			case(Game.enums.Shape.dagger):
+			sprite = this.createSpriteCirc(obj.color, obj.length);
+			break;
+
+			default:
+			if(debug) console.log(`createSprite: no matching shape`);
+			if(debug) console.assert(obj.color && obj.radius);
+			sprite = this.createSpriteCirc(obj.color, obj.radius);
+		}
+
+		if(debug) console.assert(obj.angle !== undefined);
+		//set angle of sprite for once since obstacles don't rotate for now
+		sprite.rotation = obj.angle;
+		sprite.owner = obj;
+
+		return sprite;
 	}
 	Camera.prototype.createSpriteZone = function(obj){
 		//todo. based on type
@@ -194,10 +200,53 @@
 		return sprite;
 	}
 
+	//clear fires and players sprite from stage
+	Camera.prototype.clearChildrenGame = function(){
+		this.stage.children[Game.enums.CIndex.game].children.length = 0;
+	}
+	//unncessary methods since fires and players are together?
+	//passed in objects already have sprites
+	Camera.prototype.addPlayer = function(player){
+		this.stage.children[Game.enums.CIndex.player].addChild(player.sprite);
+	}
+	Camera.prototype.clearPlayers = function(){
+		this.stage.children[Game.enums.CIndex.player].children.length = 0;
+	}
+	Camera.prototype.addFire = function(fire){
+		this.stage.children[Game.enums.CIndex.fire].addChild(fire.sprite);
+	}
+	Camera.prototype.removeFireAt = function(i){
+		this.stage.children[Game.enums.CIndex.fire].removeChildAt(i);
+	}
+	Camera.prototype.getFires = function(){
+		return this.stage.children[Game.enums.CIndex.fire].children;
+	}
+
+		// gameObject needs to have "x" and "y" properties (as world(or room) position)
+	Camera.prototype.follow = function (player) {
+		this.followed = player;
+		this.xView = this.followed.x - this.xDeadZone;
+		this.yView = this.followed.y - this.yDeadZone;
+	}
+
+	//update position on map based on followed and gGrid occupation
+	Camera.prototype.update = function () {//graphic grid cellsize and width
+		// keep following the player (or other desired object)
+
+		//update camera position on map
+		const oldXView = this.xView;
+		const oldYView = this.yView;
+		this.xView = this.followed.x - this.xDeadZone;
+		this.yView = this.followed.y - this.yDeadZone;
+		this.dx = this.xView - oldXView;
+		this.dy = this.yView - oldYView;
+
+	}
+
 	//update fires and players
 	Camera.prototype.drawGame = function(){
 
-		const gameStage = this.stage.children[Game.enums.CIndex.zones];
+		const gameStage = this.stage.children[Game.enums.CIndex.game];
     
     //update relevant sprits' positions
     gameStage.children.forEach(sprite => {
@@ -207,7 +256,7 @@
 	}
 
 	//decide if just move the zones/obstacles container or refresh all children
-	Camera.prototype.drawLand = function(stage){
+	Camera.prototype.drawLand = function(){
 		
 		if(debug) console.assert(this.xView !== undefined); 
 		if(debug) console.assert(!(this.xView % 1) && !(this.yView % 1));
@@ -294,6 +343,6 @@
 
 
 
-	Game.Graphics = Graphics;
+	Game.Camera = Camera;
 	
 })()

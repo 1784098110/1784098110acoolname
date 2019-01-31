@@ -43,12 +43,12 @@
 
     //graphics
     //todo. these should be decided based on map type
-    this.upperBackColor = '#d6d0b9';
-    this.upperOutColor = '#b3bedc';
-    this.upperLineColor = 'white';
-    this.underBackColor = 'rgb(30, 30, 30)';
-    this.underOutColor = 'black';
-    this.underLineColor = 'white';
+    this.upperBackColor = 0xd6d0b9;
+    this.upperOutColor = 0xb3bedc;
+    this.upperLineColor = 0xffffff;
+    this.underBackColor = 0x1e1e1e;
+    this.underOutColor = 0x000000;
+    this.underLineColor = 0xffffff;
     this.actualLineOpacity = 0.2;
     this.actualLineWidth = 2;
     
@@ -883,12 +883,12 @@
     
     //assemble a tree
     let trunk = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.1);
-    trunk.color = 'brown';
+    trunk.color = 0x654321;
     trunk.opType = Game.enums.OPType.treeTrunk;
     trunk.gList = Game.enums.GList.treeCrown;//because obstacle's parts are drawn together, put them in same glist
 
     let crown = new Game.Circle(radius * 4, this.x, this.y, this.angle, true, undefined);
-    crown.color = 'rgba(102, 204, 0, 0.5)';
+    crown.color = 0x8066cc00;
     crown.opType = Game.enums.OPType.treeCrown;
     crown.gList = Game.enums.GList.treeCrown;
 
@@ -904,7 +904,7 @@
     let radius = this.radius;
 
     let rock = new Game.Circle(radius, this.x, this.y, this.angle, false, 0.3);
-    rock.color = '#eb5470';
+    rock.color = 0xeb5470;
     rock.opType = Game.enums.OPType.rock;
 
     this.parts.set(rock.opType, rock);
@@ -924,13 +924,13 @@
     let dy;
     //todo. x and y also need to change to accomodate pre-set space. but house should be a complex anyway
     let part1 = new Game.Rectangle(width, height, this.x, this.y, false, 0.3);
-    part1.color = 'green';
+    part1.color = 0x00e500;
     part1.opType = Game.enums.OPType.house11;
 
     dx = wh;
     dy = hh;
     let part2 = new Game.Rectangle(wh, hh, this.x + dx, this.y + dy, false, 0.2);
-    part2.color = 'orange';
+    part2.color = 0xffa500
     part2.dx = dx;
     part2.dy = dy;
     part2.opType = Game.enums.OPType.house12;
@@ -938,7 +938,7 @@
     dx = -wh;
     dy = hh;
     let part3 = new Game.Rectangle(wh - 10, hh - 10, this.x + dx, this.y + dy, true, undefined);
-    part3.color = 'brown';
+    part3.color = 0xa52a2a;
     part3.dx = dx;
     part3.dy = dy;
     part3.opType = Game.enums.OPType.house13;
@@ -955,7 +955,7 @@
     
     let zone = new Game.Rectangle(width, height, this.x, this.y, true, undefined);
     zone.angle = this.angle + PI / 3;
-    zone.color = 'yellow';
+    zone.color = 0xffff00;
     zone.zType = Game.enums.ZType.entrance;
 
     this.zones.push(zone);
@@ -964,14 +964,14 @@
     const radius = this.radius;
   
     const zone = new Game.Circle(radius, this.x, this.y, this.angle, true, undefined);
-    zone.color = 'rgba(255,0,0, 0)';//hiding zone is invisible
+    zone.color = 0x00ff0000;//hiding zone is invisible
     zone.zType = Game.enums.ZType.hiding;
 
     this.zones.push(zone);
     
     //hiding places are indestructible
     const bush = new Game.Circle(radius, this.x, this.y, this.angle, true, undefined);
-    bush.color = 'rgba(0,102,110, 1)';
+    bush.color = 0x00666e;
     bush.opType = Game.enums.OPType.bush;
 
     this.parts.set(bush.opType, bush);
@@ -981,7 +981,7 @@
   Obstacle.prototype.box = function(){
 
     const box = new Game.Rectangle(this.width, this.height, this.x, this.y, false, -1);
-    box.color = 'rgb(110, 30, 0)';
+    box.color = 0x6e1e00;
     box.opType = Game.enums.OPType.box;
 
     this.parts.set(box.opType, box);
@@ -1113,7 +1113,7 @@
 
     this.zones.forEach(zone => {
       zone.upperGround = this.upperGround;
-      zone.color = '#00bfff';//testing
+      zone.color = 0x00bfff;//testing
       zone.zType = Game.enums.ZType.water;
       zone.gList = Game.enums.GList.zone;
 

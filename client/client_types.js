@@ -24,13 +24,6 @@ window.Game = {
   rIDCounter = 0,//process id
 };
 
-/*todo. how to handle code sharing for these js files? (below is game_core example)
-//server side we set the 'game_core' class to a global type, so that it can use it anywhere.
-if( 'undefined' != typeof global ) {
-	module.exports = global.game_core = game_core;
-}
-*/
-
 window.PI = 3.14159;
 
 //enums
@@ -62,7 +55,6 @@ Game.enums = {
 (function(){
 	function Gobject(x, y, shape, angle, passable, shield, health){
 		
-		//todo this.id = id; //only assign on server side
 		this.rID;//process id. used for uniqueness during draw etc.
 
 		//coordinate relative to world not canvas
@@ -95,7 +87,7 @@ Game.enums = {
 		this.cellsg = [];//cells occupied on graphic grid
 		this.gList;//which list in each gridg cell to occupy to optimize grid iteration
 
-		this.color = 'rgb(153, 0, 0)';//default color is maroon
+		this.color = 0x990000;//default color is maroon
 		this.sprite;
 		
 		this.upperGround;//externally assigned
@@ -232,7 +224,7 @@ Game.enums = {
 
 		//Testing. 
 		//purely for graphical purposes
-		this.color = 'red';
+		this.color = 0xff0000;
 		this.radius = 10;
 	}
 
@@ -681,9 +673,6 @@ Game.enums = {
 		this.zones = new Map();//zID for each type of occupied zone.
 		this.effects = [];//buffs etc. update and terminate themselves
 		this.tokens = new Map();//markers. todo. no need for map just set?
-		//for server only to inform clients of token change
-		this.addedTokens = [];
-		this.removedTokens = [];
 
 		this.initCombatStats();
 
@@ -831,7 +820,7 @@ Game.enums = {
 			case(Game.enums.Token.invincible):
 			//if(debug) console.log(`character draw token: ${token}`);
 			context.beginPath();
-			context.strokeStyle = 'rgb(255, 215, 0)';
+			context.strokeStyle = 0xffd700;
 			context.lineWidth = 3;
 			context.arc(0, 0, this.radius, 0, 2 * PI);
 			context.stroke();
@@ -861,14 +850,6 @@ Game.enums = {
 		this.viewW = viewW;
 		this.viewH = viewH;
 
-		//keep reference of the game player's in
-		//this.game = game; todo. not needed?
-		this.camera;//externally assigned. server only. to know what player sees
-
-		//only used on server side; for determining what a client can see
-		this.visibleFires = new Map();//server use only
-		this.removedFires = [];//server only. temporarily store fires to remove then inform clients on server update
-
 		/*todo. original game_player feature for "moving us around later" see if necessary to incorporate
 		this.old_state = {pos:{x:0,y:0}};
 		this.cur_state = {pos:{x:0,y:0}};
@@ -882,18 +863,6 @@ Game.enums = {
 
 	//testing. replace with grid checking. or at least have good vision buffer
 	//todo. vision should not be based on client window size(viewW,H), graphics should scale based on vision.
-	//only used on server side for determining if a player can see another player or fires
-	Player.prototype.sees = function(obj){
-		if(debug) console.assert(obj.x !== undefined && obj.y !== undefined);
-		if(debug) console.assert(this.viewW && this.viewH);
-		
-		let w = this.viewW / 2;
-		let h = this.viewH / 2;
-
-		//todo. this only works with small objects(no buffer area). 
-
-		return (obj.x >= (this.x - w) && obj.x <= (this.x + w) && obj.y >= (this.y - h) && obj.y <= (this.y + h));
-	}
 	Player.prototype.updateVision = function(vision){
 		if(debug) console.assert(this.viewW && this.viewH);
 		let oldVision = this.vision;

@@ -77,7 +77,7 @@
 			this.client_gameOverInterface = gameOverInterface; 
 
 			//necessary for players on clientside because client has all players' stats but only some's actions
-			this.currentPlayers = [];
+			this.currentPlayers = [];//optimize. duplicate of pixi children
 			this.clientConfig; //store temporarily to be sent when ws is connected
 
 			this.self; //special pointer for self. But self is also in regular players array
@@ -95,7 +95,7 @@
 			this.ctx = this.canvas.getContext('2d');
 
 			//camera will be set to follow self upon init
-			this.camera = new Game.Camera(this.canvas, document.body.clientWidth, document.body.clientHeight);
+			this.camera = new Game.Camera(this.canvas);
 
 			//to be fetched periodically by input handler and sent to server
 			this.controls = {
@@ -276,7 +276,7 @@
 		//if(debug && player.pID === undefined) {console.log(`add undefined pID: playerconfig: `); console.log(playerConfig);}
 
     //add graphic
-    this.camera.createSpritePlayer(player);
+    player.sprite = this.camera.createSpritePlayer(player);
 
 		//self is also in regular players list, but before spawn message self has no pid
 		if(this.self === undefined && player.pID === undefined) {
@@ -603,32 +603,6 @@
 		this.ws.send(  server_packet  );
 	
 	}; //game_core.client_handle_input
-
-	//client side zone processing to determine graphics
-	game_core.prototype.client_handleZones = function(){
-
-		this.gtoggledObstacles.clear();//refresh obstacles to toggle graphics
-
-		this.currentPlayers.forEach((player) => {
-			//called directly after server update. should all be active players
-			//if(debug && !(player.state === Game.enums.PState.active)) console.log(`client_handlezones: player state: ${player.state} pId: ${player.pID}`);
-			
-			this.map.handleZones(player);
-
-			//change obstacles' graphics based on self zones
-			if(player.pID !== this.self.pID) return;
-			player.zones.forEach((zID, zType) => {
-				//certain types of zones when occupied by self change graphics
-				if(zType === Game.enums.ZType.hiding){
-					if(debug) console.assert(this.map.zones.get(zID).oID !== undefined);
-
-					//optimize. ?? neater way to handle toggled graphics of obstacles?
-					this.gtoggledObstacles.add(this.map.zones.get(zID).oID);
-				}
-			});
-
-		});
-	}
 	
 	//parse regular server update(websocket message)
 	game_core.prototype.client_parseServerUpdate = function(data){
@@ -744,14 +718,17 @@
 	}
 	//create a fire based on parsed server update object
 	game_core.prototype.client_addFire = function(instance){
-		let fire;
 
-		fire = new Game.Fire(instance.x, instance.y, instance.angle, instance.player, instance.wType, instance.mx, instance.my, instance.traveled, instance.holdRadius);
+		const fire = new Game.Fire(instance.x, instance.y, instance.angle, instance.player, instance.wType, instance.mx, instance.my, instance.traveled, instance.holdRadius);
 
 		fire.fID = instance.fID;
 
 		//if(debug) console.log(instance);
 		//if(debug) {console.log('client createFire: fire: '); console.log(fire);}
+
+		//add to camera
+		fire.sprite = this.camera.createSpriteFire(fire);
+		this.camera.addFire(fire);
 
 		this.fires.set(fire.fID, fire);
 	}
@@ -778,7 +755,7 @@
 			//information to interpolate with so it misses positions, and packet loss destroys this approach
 			//even more so. See 'the bouncing ball problem' on Wikipedia.
 
-			//update objects
+			//update objects(obstacles)
 			for(let i = 0, l = update.updatedObjects.length; i < l; i++){
 				const instance = update.updatedObjects[i];
 				const obj = this.map.objects.get(instance.jID);
@@ -809,77 +786,76 @@
 
 			//update players including self
 			this.currentPlayers = []; 
+			this.camera.clearPlayers();//inlcude fires and players
+			this.gtoggledObstacles.clear();//refresh obstacles to toggle graphics
+
 			for(let i = 0, l = update.players.length; i < l; i++){
 				const player = this.players.get(update.players[i].pID);
 
 				//if(debug) {console.log('player update: pID: ' + pID + ' update: '); console.log(update.players[i]);}
 				if(debug && !player) console.log(` ::ERROR:: server update received: player is undefined: pID: ${update.players[i].pID}`);
 				this.currentPlayers.push(player);
+				this.camera.addPlayer(player);//add to graphics
+
 				player.handleServerUpdate(update.players[i]);
+
+				//decide graphic change based on client zone interaction
+				this.map.handleZones(player);
+				//change obstacles' graphics based on self zones
+				if(player.pID !== this.self.pID) return;
+				player.zones.forEach((zID, zType) => {
+					//certain types of zones when occupied by self change graphics
+					if(zType === Game.enums.ZType.hiding){
+						if(debug) console.assert(this.map.zones.get(zID).oID !== undefined);
+
+						//optimize. ?? neater way to handle toggled graphics of obstacles?
+						this.gtoggledObstacles.add(this.map.zones.get(zID).oID);
+					}
+				});
 			}
 
-			//update graphic changes due to zones here
-			this.client_handleZones();
+			if(debug) const alreadyRemovedCount = 0;
+			//mark removed fires by their fid
+			for(let i = 0, l = update.removedFires.length; i < l; i++){
+				const fire = this.fires.get(update.removedFires[i]);
+
+				if(fire) fire.terminate = true;//check because it might already be removed by client side update
+				else if(debug) alreadyRemovedCount++;
+			}
+			if(debug) console.log(`onserverupdate: starting removed fire iteration: length: ${update.removedFires.length} already removed Length: ${alreadyRemovedCount}`);
+
+
+			//update/actually remove fires. iterate graphic fires instead of map for easy graphic removal
+			const fires = this.camera.getFires();
+			for(let i = fires.length - 1; i >= 0; i--){
+				const fire = fires[i].owner;
+				if(fire.terminate){
+					this.camera.removeFireAt(i);
+					this.fires.delete(fire.fID);
+				} 
+				else fire.update(t);
+			}
 
 			//add new fires
-			let t = Date.now();//put it here for now until proper physics and server update on client
+			const t = Date.now();//todo. put it here for now until proper physics and server update on client
 			for(let i = 0, l = update.fires.length; i < l; i++){
 				let instance = update.fires[i];
-				//for now only have bullets
+				
 				this.client_addFire(instance);
-
 				//if(debug) console.log('new fire: fID: ' + fire.fID);
 			}
 
-			//remove fires with their fid
-			for(let i = 0, l = update.removedFires.length; i < l; i++){
-				let fire = this.fires.get(update.removedFires[i]);
-
-				//if(debug) console.log('remove fire: fID: ' + update.firesRemoved[i]);
-
-				if(fire) fire.terminate = true;//check because it might already be removed by client side update
-			}
-			
-			//update fires
-			this.fires.forEach((fire) => {
-				//map not involved on client side yet
-
-				//?? check for going out of view too?
-				//delete dead objects. -1 is life code for self termination
-				if(fire.terminate) {
-					//if(debug) {console.log('fire deleted: fire: '); console.log(fire);}
-					this.fires.delete(fire.fID);
-					//if(debug) console.log(this.fires);
-					return;
-				}
-				fire.update(t);
-			});
-
-			this.camera.update();//update camera coords right after self update. otherwise coors don't synchronize and jitter happens
-
-	
+			this.camera.update();//update camera coords right after self update. otherwise coors don't synchronize and jitter happens	
 	
 	}; //game_core.client_onserverupdate_received
 	
 	game_core.prototype.client_update = function() {
 
 		//todo. scale?
-		const upperGround = this.self.upperGround;
-		const ctx = this.ctx;
-		const xView = this.camera.xView;
-		const yView = this.camera.yView;
-		const width = this.camera.width;
-		const height = this.camera.height;
-		const scale = this.camera.scale;
-		const subGridX = this.camera.subGridX;
-		const subGridY = this.camera.subGridY;
-		const subGridXMax = this.camera.subGridXMax;
-		const subGridYMax = this.camera.subGridYMax;
-
-		//Clear the screen area
-		ctx.clearRect(0, 0, width, height);
+		//?? where should camera.update be called?
 		
-		this.map.drawBackground(ctx, xView, yView, width, height, scale, upperGround, subGridX, subGridY, subGridXMax, subGridYMax);
+		this.camera.drawGame();
+		this.camera.drawLand();
 	
 			//Capture inputs from the player
 		this.client_handle_input();
@@ -907,15 +883,10 @@
 			
 		}
 
-		//obstacles come last
-		this.drawObstacles(ctx, xView, yView, scale, subGridX, subGridY, subGridXMax, subGridYMax);
-
 		//always draw minimap
 		if(this.showMiniMap) this.drawMiniMap(ctx, width, height);
-
 		//player map, mini map and stats don't care about scale. 
 		if(this.showMap) this.drawPlayerMap(ctx, width, height);
-
 		//draw stats
 		this.drawStats(ctx, width, height);
 		
