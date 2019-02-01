@@ -814,7 +814,7 @@
 				});
 			}
 
-			if(debug) const alreadyRemovedCount = 0;
+			let alreadyRemovedCount = 0;
 			//mark removed fires by their fid
 			for(let i = 0, l = update.removedFires.length; i < l; i++){
 				const fire = this.fires.get(update.removedFires[i]);
@@ -825,7 +825,7 @@
 			if(debug) console.log(`onserverupdate: starting removed fire iteration: length: ${update.removedFires.length} already removed Length: ${alreadyRemovedCount}`);
 
 
-			//update/actually remove fires. iterate graphic fires instead of map for easy graphic removal
+			//update and actually remove fires. iterate graphic fires instead of map for easy graphic removal
 			const fires = this.camera.getFires();
 			for(let i = fires.length - 1; i >= 0; i--){
 				const fire = fires[i].owner;
@@ -855,7 +855,6 @@
 		//?? where should camera.update be called?
 		
 		this.camera.drawGame();
-		this.camera.drawLand();
 	
 			//Capture inputs from the player
 		this.client_handle_input();
@@ -887,7 +886,7 @@
 		if(this.showMiniMap) this.drawMiniMap(ctx, width, height);
 		//player map, mini map and stats don't care about scale. 
 		if(this.showMap) this.drawPlayerMap(ctx, width, height);
-		//draw stats
+		//draw stats ?? integrate into camera?
 		this.drawStats(ctx, width, height);
 		
 		//todo. not predicting for nfow

@@ -61,6 +61,7 @@ function handleConfigs(e){
 		});
 		const content = await rawResponse.json();
 		const viewPort = document.getElementById('gameCanvas');
+
 		//if(debug) console.log(`handleconfigs: gameCanvas width: ${viewPort.clientWidth} height: ${viewPort.clientHeight}`);
 		game.client_initGame(content, viewPort.clientWidth, viewPort.clientHeight);
 		
@@ -200,7 +201,7 @@ window.onload = function(){
 	
 		//Create our game client instance without actual game and player info
 	//const start = Date.now();
-	game = new game_core(false, undefined, gameOverInterface.bind(this)); //it's not global, a let in the closure
+	game = new game_core(undefined, gameOverInterface.bind(this)); //it's not global, a let in the closure
 
 	//if(debug) console.log(`gamecore construct time: ${Date.now() - start}`);
 

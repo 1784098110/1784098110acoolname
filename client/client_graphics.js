@@ -2,6 +2,8 @@
 
 	function Camera(canvas){
 
+		if(debug) console.log(`Camera Construct`);
+
 		this.canvas = canvas;
 		this.canvas.width = window.innerWidth;
 		this.canvas.height = window.innerHeight;
@@ -59,7 +61,7 @@
 	//first called right after mapinfo then whenever viewport dimension changes
 	Camera.prototype.createVisualGrid = function(){
 
-		const gridStage = this.stage.children[Game.enums.CIndex.lines];
+		const gridStage = this.stage.children[Game.enums.CIndex.grid];
 		gridStage.children.length = 0;//clear
 
 		const wCount = Math.cell(this.wView / this.visualCellSize);
@@ -200,10 +202,6 @@
 		return sprite;
 	}
 
-	//clear fires and players sprite from stage
-	Camera.prototype.clearChildrenGame = function(){
-		this.stage.children[Game.enums.CIndex.game].children.length = 0;
-	}
 	//unncessary methods since fires and players are together?
 	//passed in objects already have sprites
 	Camera.prototype.addPlayer = function(player){
@@ -243,16 +241,20 @@
 
 	}
 
-	//update fires and players
+	//update all game related graphic
 	Camera.prototype.drawGame = function(){
 
-		const gameStage = this.stage.children[Game.enums.CIndex.game];
+		this.drawLand();
     
-    //update relevant sprits' positions
-    gameStage.children.forEach(sprite => {
-    	sprite.position.set(sprite.owner.x - this.xView, sprite.owner.y - this.yView);
-    	sprite.rotation.set(sprite.owner.angle);
-    });
+		this.stage.children[Game.enums.CIndex.fire].children.forEach(sprite => {
+			sprite.position.set(sprite.owner.x - this.xView, sprite.owner.y - this.yView);
+			sprite.rotation.set(sprite.owner.angle);
+		});
+
+		this.stage.children[Game.enums.CIndex.player].children.forEach(sprite => {
+			sprite.position.set(sprite.owner.x - this.xView, sprite.owner.y - this.yView);
+			sprite.rotation.set(sprite.owner.angle);
+		});
 	}
 
 	//decide if just move the zones/obstacles container or refresh all children
@@ -282,7 +284,7 @@
 		this.subGridYMax = (subGridYMax >= this.gridW) ? this.gridW - 1 : subGridYMax;
 
 		//update visual Grid, reset pos if needed
-		const gridStage = this.stage.children[Game.enums.CIndex.lines];
+		const gridStage = this.stage.children[Game.enums.CIndex.grid];
 		gridStage.position.set(gridStage.x - this.dx, gridStage.y - this.dy);
 		if(gridStage.x > this.visualCellSize) gridStage.x -= this.visualCellSize;
 		if(gridStage.x < -this.visualCellSize) gridStage.x += this.visualCellSize;
@@ -290,7 +292,7 @@
 		if(gridStage.y < -this.visualCellSize) gridStage.y += this.visualCellSize;
 
 
-		const zoneStage = this.stage.children[Game.enums.CIndex.zones];
+		const zoneStage = this.stage.children[Game.enums.CIndex.zone];
 		const obstacleStage = this.stage.children[Game.enums.CIndex.obstacles];
 
 		//if grid doesn't change don't update graphic children, just move containers
