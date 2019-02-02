@@ -1015,20 +1015,16 @@ Game.enums = {
 
 
 
-//Camera, handles graphics
+//server side Camera, handles what player sees
 (function () {
 	//optimize. x and y view can be calculated with player and canvas stats
-	function Camera(canvas, canvasWidth, canvasHeight) {
+	function Camera(viewW, viewH) {
 		
 		this.followed;//assigned with follow method
 
-		this.canvas = canvas;
-		this.canvas.width = canvasWidth;
-		this.canvas.height = canvasHeight;
-
 		//client's actual window size. can change  ?? need separate from width and height?
-		this.wView = canvasWidth;
-		this.hView = canvasHeight;
+		this.wView = viewW;
+		this.hView = viewH;
 		this.scale;//scale of graphics to actual size
 
 		// viewport dimensions, on world map not the same as view size
@@ -1048,10 +1044,6 @@ Game.enums = {
 		this.subGridY;
 		this.subGridXMax;
 		this.subGridYMax;
-
-		//pixijs application
-		this.app = new pixiApplication({view: this.canvas});
-		this.app.renderer.autoResize = true;
 	}
 
 	// gameObject needs to have "x" and "y" properties (as world(or room) position)

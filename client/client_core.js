@@ -178,7 +178,7 @@
 		//init map
 		this.map = new Game.Land(this.instance.width, this.instance.height, this.instance.cellSize);
     this.map.camera = this.camera;//testing
-    this.camera.setMapInfo(this.map.cellSizeg, this.map.gridWg);
+    this.camera.setMapInfo(this.map.gridgUpper, this.map.cellSizeg, this.map.gridWg);
 		
 		this.generateMap(this.instance.mapSeed);
 		//if(debug) console.log(`map generate time: ${Date.now() - start0}`);
@@ -251,7 +251,7 @@
 		let playerConfig = {
 
 			pID: undefined, //is undefined if this is client core
-			tID: pID, //todo. no team play for now
+			tID: undefined, //todo. no team play for now
 			health: 100, //todo. these stats should change depending on clientConfig(carrying weight, buffs)
 			speed: 300,
 			vision: 1,
@@ -338,7 +338,7 @@
 		//complexes, get big ones first
 		//argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, cType 
 		let complexTemplatesUpper = [//upper ground
-			[1, 200, width - 200, 200, height - 200, Game.enums.CType.bushFence]
+			[0, 200, width - 200, 200, height - 200, Game.enums.CType.bushFence]
 		];
 		complexTemplatesUpper.forEach((template) => {
 			let count = template[0];
@@ -510,7 +510,7 @@
 		const obj = new Game.Obstacle(placeHolder.radius, placeHolder.width, placeHolder.height, x, y, angle, oID, oType, upperGround);
 		
     //add sprite
-    obj.sprite = this.createSpriteObstacle(obj);
+		obj.sprite = this.camera.createSpriteObstacle(obj);
 
 		//add all parts and zones and add to list
 		obj.parts.forEach((part) => {
@@ -822,8 +822,9 @@
 				if(fire) fire.terminate = true;//check because it might already be removed by client side update
 				else if(debug) alreadyRemovedCount++;
 			}
-			if(debug) console.log(`onserverupdate: starting removed fire iteration: length: ${update.removedFires.length} already removed Length: ${alreadyRemovedCount}`);
+			//if(debug) console.log(`onserverupdate: starting removed fire iteration: length: ${update.removedFires.length} already removed Length: ${alreadyRemovedCount}`);
 
+			const t = Date.now();//todo. put it here for now until proper physics and server update on client
 
 			//update and actually remove fires. iterate graphic fires instead of map for easy graphic removal
 			const fires = this.camera.getFires();
@@ -837,7 +838,6 @@
 			}
 
 			//add new fires
-			const t = Date.now();//todo. put it here for now until proper physics and server update on client
 			for(let i = 0, l = update.fires.length; i < l; i++){
 				let instance = update.fires[i];
 				
@@ -851,6 +851,9 @@
 	
 	game_core.prototype.client_update = function() {
 
+		const width = this.camera.width;
+		const height = this.camera.height;
+		const ctx = this.ctx;
 		//todo. scale?
 		//?? where should camera.update be called?
 		
@@ -866,20 +869,6 @@
 			//update the actual local client position on screen as well.
 		if( !this.naive_approach ) {
 			//this.client_process_net_updates();
-		}
-
-		//draw fires. because server only notifies of relevant fires. no need to use graphic grid here
-		this.fires.forEach(fire => {
-			fire.draw(ctx, xView, yView, scale);
-		})
-		//if(debug) console.log('client update: players(other) length: ' + this.currentPlayers.length);
-		
-		//draw players including self
-		for(let i = 0, l = this.currentPlayers.length; i < l; i++){
-			const player = this.currentPlayers[i];
-
-			player.draw(ctx, xView, yView, scale);
-			
 		}
 
 		//always draw minimap
@@ -902,6 +891,7 @@
 		/**
 		 * todotodo.
 		 * 
+		 * complex's obs don't have spirtes because it skips add obstacle and go straight to obstacle construct. fix this when obstacles all become single objects.
 		 * incorporate sprite creation to adding stuff
 		 */
 		/**

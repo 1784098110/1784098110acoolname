@@ -86,7 +86,7 @@ function handleConfigs(e){
 //?? best way to handle sprite fetching?
 function fetchSprites () {
 
-	let spriteNames = [Game.enums.WType.dagger, Game.enums.WType.broadsword];
+	let spriteNames = [`dagger`, `broadsword`];
 
 	/*todo right now is fetching one by one, fetch by pack?? fetch as one image?
 	for(let i = 0, l = spritesNames.length; i<l; i++){
@@ -114,7 +114,7 @@ function fetchSprites () {
 	}*/	
 
 	//load sprites and store in global object
-	sprites = spriteNames.map(spriteName => {
+	const sprites = spriteNames.map(spriteName => {
 		return {name: spriteName, url: `sprites/${spriteName}.png`};
 	});
 
@@ -123,7 +123,7 @@ function fetchSprites () {
 			Game.Textures[spriteName] = resources[spriteName].texture;
 		});
 
-		if(debug) console.log(`pixiloader finished loading. game textures length: ${Game.Textures.size}`);
+		if(debug) console.log(`pixiloader finished loading`);
 	});
 	/*
 	spriteNames.forEach(spriteName => {

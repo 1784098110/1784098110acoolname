@@ -649,6 +649,10 @@
 
     //if(debug) console.log('Obstacle construct: upperground: ' + upperGround);
 
+    //?? just inherit gobject?
+    this.rID;
+    this.sprite;
+
     this.radius = radius;
     this.width = width;
     this.height = height;
@@ -722,6 +726,7 @@
     this.parts.forEach(part => {
       //oid is externally assigned
       part.oID = this.oID;
+      part.obstacle = this;
       part.xMin = this.xMin;
       part.xMax = this.xMax;
       part.yMin = this.yMin;
