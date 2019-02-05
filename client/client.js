@@ -38,7 +38,7 @@ function handleConfigs(e){
 
 	game.clientConfig = {//sent to server only when client is actually in the game
 		name: config.elements['name'].value,
-		color: config.elements['color'].value,
+		color: parseInt(config.elements['color'].value.replace(/^#/, ''), 16),
 		lWeapon: config.elements['lWeapon'].value,
 		rWeapon: config.elements['rWeapon'].value,
 		skill: config.elements['skill'].value,

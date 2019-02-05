@@ -3,8 +3,8 @@
 	function Camera(canvas){
 
 		this.canvas = canvas;
-		this.canvas.width = window.innerWidth;
-		this.canvas.height = window.innerHeight;
+
+		if(debug) console.log(`camera construct: canvas size: ${this.canvas.width} ${this.canvas.height}`);
 
 		// viewport dimensions, the size as seen
 		this.width = canvas.width;
@@ -38,7 +38,6 @@
 		this.visualCellSize = 200;//optimize. unnecessary distinction? just make it cellSize?
 
 		if(debug) console.assert(this.canvas instanceof HTMLElement);
-		if(debug) console.log(`canvas size: ${this.canvas.width} ${this.canvas.height}`);
 
 		//manually create pixi application
 		this.renderer = new PIXI.CanvasRenderer({view: this.canvas});
@@ -46,6 +45,7 @@
 		
 		//this.app = new PIXI.Application({view: this.canvas});
 		this.renderer.autoResize = true;
+		this.renderer.resize(window.innerWidth, window.innerHeight);
 		this.renderer.backgroundColor = this.backgroundColor;
 
 		this.followed;
@@ -71,13 +71,20 @@
 	Camera.prototype.createVisualGrid = function(){
 
 		const gridStage = this.stage.children[Game.enums.CIndex.grid];
-		gridStage.children.length = 0;//clear
+		gridStage.children.length = 0;
+		//create separate stages for horizontal and vertical lines
+		const horGridStage = new PIXI.Container();
+		const verGridStage = new PIXI.Container();
+		gridStage.addChild(horGridStage);
+		gridStage.addChild(verGridStage);
 
-		const wCount = Math.ceil(this.wView / this.visualCellSize);
-		const hCount = Math.ceil(this.hView / this.visualCellSize);
+		const wCount = Math.ceil(this.wView / this.visualCellSize) + 1;
+		const hCount = Math.ceil(this.hView / this.visualCellSize) + 1;
 		const thickness = 4;
-		const color = 0xfffffa;
-		const opacity = 1;
+		const color = 0x000000;
+		const opacity = 0.3;
+
+		//if(debug) console.log(`createVisualGrid: wCount: ${wCount} hCount: ${hCount}`);
 
 		for(let i = 0; i < wCount; i++){
 			const line = new PIXI.Graphics();
@@ -85,7 +92,7 @@
 			line.moveTo(0, 0);
 			line.lineTo(0, this.hView);
 			line.position.set(i * this.visualCellSize, 0);
-			gridStage.addChild(line);
+			verGridStage.addChild(line);
 		}
 		for(let i = 0; i < hCount; i++){
 			const line = new PIXI.Graphics();
@@ -93,7 +100,7 @@
 			line.moveTo(0, 0);
 			line.lineTo(this.wView, 0);
 			line.position.set(0, i * this.visualCellSize);
-			gridStage.addChild(line);
+			horGridStage.addChild(line);
 		}
 	}
 
@@ -169,24 +176,24 @@
 		return sprite;
 	}
 	//sprite creation for all kinds of obj/combinations
-	Camera.prototype.createSpriteObstacle = function(obj){
+	Camera.prototype.createSpriteObject = function(obj){
 		//todo. right now only differentiate shape, need to be based on type too
 		let sprite;
 		switch(obj.shape){
-			case(Game.enums.Shape.Rectangle):
-			sprite = this.createSpriteRec(0xff0000, obj.width, obj.height);
+			case(Game.enums.Shape.rectangle):
+			sprite = this.createSpriteRec(obj.color, obj.width, obj.height);
 			break;
 
-			case(Game.enums.Shape.Circle):
-			sprite = this.createSpriteCirc(0x00ff00, obj.radius);
+			case(Game.enums.Shape.circle):
+			sprite = this.createSpriteCirc(obj.color, obj.radius);
 			break;
 
 			default:
-			if(debug) console.log(`createSprite: no matching shape: ${obj.shape}`);
+			if(debug) console.log(`createSpriteObject: no matching shape: ${obj.shape}`);
 		}
 
 		if(debug) console.assert(obj.angle !== undefined);
-		if(debug) console.log(`camere createSpriteObstacle: id: ${obj.oID} type: ${obj.oType}`);
+		//if(debug) console.log(`camere createSpriteObject: id: ${obj.oID} type: ${obj.opType} color: ${obj.color} shape: ${obj.shape} radius: ${obj.radius}`);
 
 		//set angle of sprite for once since obstacles don't rotate for now
 		sprite.rotation = obj.angle;
@@ -205,10 +212,14 @@
 		return sprite;
 	}
 	Camera.prototype.createSpriteCirc = function(color, radius){
+		//if(debug) console.log(`createspriteCirc: color: ${color} radius: ${radius}`);
+
 		const sprite = new PIXI.Graphics();
 		sprite.beginFill(color);
 		sprite.drawCircle(0, 0, radius);
 		sprite.endFill();
+
+		if(debug) console.assert(sprite);
 
 		return sprite;
 	}
@@ -298,13 +309,17 @@
 
 		//update visual Grid, reset pos if needed
 		const gridStage = this.stage.children[Game.enums.CIndex.grid];
-		gridStage.position.set(gridStage.x - this.dx, gridStage.y - this.dy);
-		if(gridStage.x > this.visualCellSize) gridStage.x -= this.visualCellSize;
-		if(gridStage.x < -this.visualCellSize) gridStage.x += this.visualCellSize;
-		if(gridStage.y > this.visualCellSize) gridStage.y -= this.visualCellSize;
-		if(gridStage.y < -this.visualCellSize) gridStage.y += this.visualCellSize;
+		const horGridStage = gridStage.children[Game.enums.CIndex.horGrid];
+		const verGridStage = gridStage.children[Game.enums.CIndex.verGrid];
 
+		horGridStage.position.set(0, horGridStage.y - this.dy);
+		verGridStage.position.set(verGridStage.x - this.dx, 0);
+		if(verGridStage.x > this.visualCellSize) verGridStage.x -= this.visualCellSize;
+		if(verGridStage.x < -this.visualCellSize) verGridStage.x += this.visualCellSize;
+		if(horGridStage.y > this.visualCellSize) horGridStage.y -= this.visualCellSize;
+		if(horGridStage.y < -this.visualCellSize) horGridStage.y += this.visualCellSize;
 
+		//update zones and land
 		const zoneStage = this.stage.children[Game.enums.CIndex.zone];
 		const obstacleStage = this.stage.children[Game.enums.CIndex.obstacle];
 
@@ -332,7 +347,7 @@
 	        grid[i][j][Game.enums.GList.zone].forEach(obj => {
 	          if(debug) console.assert(obj.zID !== undefined);
 						if(obj.rID === rID) return;//if already drawn
-						if(debug) console.log(`drawLand zone: Id: ${obj.zID} x: ${obj.x} Type: ${obj.zType}`);					
+						//if(debug) console.log(`drawLand zone: Id: ${obj.zID} x: ${obj.x} Type: ${obj.zType}`);					
 
 	          //set position
 	          obj.sprite.position.set(obj.x - this.xView, obj.y - this.yView);
@@ -344,9 +359,10 @@
 
 	        grid[i][j][Game.enums.GList.obstacle].forEach(obj => {
 						if(debug) console.assert(obj.oID !== undefined);
-						obj = obj.obstacle;
 						if(obj.rID === rID) return;//if already drawn
-						if(debug) console.log(`drawLand obstacle: oId: ${obj.oID} x: ${obj.x} y: ${obj.y} obj.oType: ${obj.oType} obj.parts.length: ${obj.parts.size}`);
+						//if(debug) console.log(`drawLand obstacle: oId: ${obj.oID} x: ${obj.x} y: ${obj.y} obj.oType: ${obj.oType} obj.parts.length: ${obj.parts.size}`);
+
+						if(debug && !obj.sprite) console.log(`drawland: obstacle part no sprite: oid: ${obj.oID} type: ${obj.opType} color: ${obj.color} shape: ${obj.shape} radius: ${obj.radius}`);
 
 	          //set position
 	          obj.sprite.position.set(obj.x - this.xView, obj.y - this.yView);

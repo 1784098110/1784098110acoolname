@@ -95,7 +95,79 @@
     return this.jidCounter++; 
   
   }
-  //zones are permanent
+  Land.prototype.addCamera = function(camera){
+    this.camera = camera;
+  }
+  //combine add object, checkcollides, and remove object
+  Land.prototype.checkPlaceHolder = function(obj){
+
+    const grid = this.gridUpper;
+    const cells = obj.cells;
+    let collide = false;
+    const x = (obj.x);
+    const y = (obj.y);
+
+    obj.jID = this.createJID();
+
+    //grid coors of the bounds of obj
+    let x1, y1, x2, y2;
+    //determine object size and location based on shape
+    let wh = (obj.width / 2) || obj.radius;
+    let hh = (obj.height / 2) || obj.radius;
+
+    //which cell does the edges of the object occupy
+    x1 = Math.floor((x - wh) / this.cellSize);
+    y1 = Math.floor((y - hh) / this.cellSize);
+    x2 = Math.floor((x + wh) / this.cellSize);
+    y2 = Math.floor((y + hh) / this.cellSize);
+
+    //fill the cells between the ones occupied by object's edges
+    const gridH = this.gridW;
+    for (let i = (x1 > 0 ? x1 : 0), i2 = (x2 < gridH) ? x2 : (gridH - 1); i <= i2; i++){
+      for (let j = (y1 > 0 ? y1 : 0), j2 = (y2 < gridH) ? y2 : (gridH - 1); j <= j2; j++){
+        if(debug && !(grid[i] && grid[i][j])) console.log(':: ERROR: map addobj: !grid[i]: obj.x: ' + obj.x + ' obj.y: ' + obj.y + ' w: ' + w + ' h: ' + h + ' i: ' + i + ' j: ' + j + ' obj.jID: ' + obj.jID);
+        if(debug) console.assert(grid[i][j]);
+
+        grid[i][j].push(obj);
+        obj.cells.push(i * gridH + j);
+      }
+    }
+
+    //Check collides
+    if(obj.checkBoundary()) collide = true; 
+
+    //check for collision with all objects in ocupied cells
+    const lastCheck = [];
+    let inhabs;
+    for(let i = 0, length = cells.length; i < length; i++){
+      inhabs = grid[Math.floor(cells[i]/gridH)][cells[i]%gridH];
+
+      for(let j = 0, length = inhabs.length; j<length; j++){
+        const inhab = inhabs[j];
+
+        //no need to check twice the same obj. fires should not exist when this function is called
+        if(debug) console.assert(inhab.jID !== undefined);
+        if(lastCheck[inhab.jID]) continue;
+        lastCheck[inhab.jID] = true;
+
+        if(!inhab.passable && inhab.jID !== obj.jID){
+          if(obj.checkCollide(inhab)) collide = true;
+        } 
+      }
+    }
+
+    //remove Object
+    let xc, yc;
+
+    for (let i = 0, l = cells.length; i < l; i++){
+      xc = Math.floor(cells[i] / gridH);
+      yc = cells[i] % gridH;
+      grid[xc][yc].splice(grid[xc][yc].indexOf(obj), 1);
+    }
+    obj.cells = [];
+
+    return collide;
+  }
   Land.prototype.addZone = function(obj){
     //zones can be rotated rectangles
 
@@ -239,6 +311,9 @@
       this.objects.set(obj.jID, obj);
     } 
 
+    //don't add sprite if it's a place holder
+    obj.sprite = this.camera.createSpriteObject(obj);
+
     //if(debug && !obj.upperGround) console.log('map addobject: obj upperground: ' + obj.upperGround);
 
     const x = (obj.x);
@@ -324,7 +399,7 @@
   }
   Land.prototype.removeObject = function(obj){
 
-    const gList =  obj.gList;
+    const gList = obj.gList;
     let grid, gridg;
     [grid, gridg] = (obj.upperGround === true) ? [this.gridUpper, this.gridgUpper] : [this.gridUnder, this.gridgUnder];
     const cells = obj.cells;
@@ -648,10 +723,6 @@
   function Obstacle(radius, width, height, x, y, angle, oID, oType, upperGround){//count is number of this obstacles on the map
 
     //if(debug) console.log('Obstacle construct: upperground: ' + upperGround);
-
-    //?? just inherit gobject?
-    this.rID;
-    this.sprite;
 
     this.radius = radius;
     this.width = width;

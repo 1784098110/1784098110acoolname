@@ -177,7 +177,7 @@
 
 		//init map
 		this.map = new Game.Land(this.instance.width, this.instance.height, this.instance.cellSize);
-    this.map.camera = this.camera;//testing
+    this.map.addCamera(this.camera);//testing
     this.camera.setMapInfo(this.map.gridgUpper, this.map.cellSizeg, this.map.gridWg);
 		
 		this.generateMap(this.instance.mapSeed);
@@ -352,12 +352,12 @@
 		//argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, oType 
 		let templatesUpper = [//upper ground
 			[0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
-			[10, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
-			[10, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
-			[10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
+			[50, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
+			[0, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
+			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance],
 			[0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
-			[20, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
+			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
 		];
 
 		let tooManyCollideCounterUpper = 0;
@@ -377,7 +377,6 @@
 
 		//count how many times have tried to fit one obstacle. 
 		if(count === undefined) count = 0;
-		let collide = false;
 
 		//generate new coor within bound
 		const x = Math.round(generator.random() * (xMax - xMin)) + xMin;
@@ -409,9 +408,8 @@
 		else if(width !== undefined) placeHolder = new Game.Rectangle(width, height, x, y, false, undefined);
 		placeHolder.upperGround = upperGround;
 		placeHolder.gList = Game.enums.GList.obstacle;
-		this.map.addObject(placeHolder);
-		if(this.map.checkCollides(placeHolder) || this.map.checkZones(placeHolder)) collide = true;
-		this.map.removeObject(placeHolder);
+		
+		const collide = this.map.checkPlaceHolder(placeHolder);
 
 		if(collide){//start over if doesn't fit
 			if(++count > 5){//magic number
@@ -473,6 +471,7 @@
 			angle = Math.floor(generator.random() * 4) * (PI / 2);
 		}
 
+		//optimize. inefficient to check includes.
 		const circlePlaceHolder = [Game.enums.OType.tree, Game.enums.OType.rock, Game.enums.OType.bush];
 		const rectanglePlaceHolder = [Game.enums.OType.house, Game.enums.OType.entrance, Game.enums.OType.box];
 
@@ -490,12 +489,7 @@
 		else if(debug) console.log(` ::ERROR:: addobstacle no matching oType: ${oType}`);
 	
 		//plug in map to see if no collide
-		let collide = false;
-		placeHolder.upperGround = upperGround;
-		placeHolder.gList = Game.enums.GList.obstacle;
-		this.map.addObject(placeHolder);
-		if(this.map.checkCollides(placeHolder) || this.map.checkZones(placeHolder)) collide = true;
-		this.map.removeObject(placeHolder);
+		const collide = this.map.checkPlaceHolder(placeHolder);
 
 		if(collide){//start over if doesn't fit
 			if(++count > 5){//magic number
@@ -508,9 +502,6 @@
 		//else if fitted
 		const oID = this.createOID();
 		const obj = new Game.Obstacle(placeHolder.radius, placeHolder.width, placeHolder.height, x, y, angle, oID, oType, upperGround);
-		
-    //add sprite
-		obj.sprite = this.camera.createSpriteObstacle(obj);
 
 		//add all parts and zones and add to list
 		obj.parts.forEach((part) => {
@@ -893,9 +884,11 @@
 		 * 
 		 * complex's obs don't have spirtes because it skips add obstacle and go straight to obstacle construct. fix this when obstacles all become single objects.
 		 * incorporate sprite creation to adding stuff
+		 * player color from form is # hex format, need to translate into 0x for pixi
 		 */
 		/**
 		 * ??
+		 * Error: WebSocket is not open: readyState 2 (CLOSING) happened when server tried to send update to client. possibly because the update was sent at the moment when the client window closed, that fraction of a second. need to catch the error and not cause it to stop the server next time this happens
 		 * Draw trunk and crown on same level still too unnatural? draw obstacle parts separatedly is only way to solve
 		 * Instead of skill and weapons' spriteindex, just pass all the sprite indexes about player? (to cover special effect etc)
 		 *  or add special graphic ids about player ITSELF in addition to tool's indexes.

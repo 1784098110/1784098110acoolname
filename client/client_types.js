@@ -47,7 +47,7 @@ Game.enums = {
 
 	//Graphics
 	GList: Object.freeze({'zone': 0, 'fire': 1, 'entity': 2, 'obstacle': 3, 'treeCrown': 4}),//optimize. ?? reduce number of glists?
-	CIndex: Object.freeze({'zone': 0, 'grid': 1, 'fire': 2, 'player': 3, 'obstacle': 4, 'treeCrown': 5}),
+	CIndex: Object.freeze({'zone': 0, 'grid': 1, 'horGrid': 0, 'verGrid': 1, 'fire': 2, 'player': 3, 'obstacle': 4, 'treeCrown': 5}),
 
 };
 
