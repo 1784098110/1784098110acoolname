@@ -387,7 +387,7 @@
 		sprite.beginFill(color);
 		const w2 = width / 2;
 		const h2 = height / 2;
-		sprite.drawRect(-w2, -h2, w2, h2);
+		sprite.drawRect(-w2, -h2, width, height);
 		sprite.endFill();
 
 		return sprite;
