@@ -26,16 +26,23 @@
 		this.yDeadZone = Math.round(this.height/2);
 
 		//bounds of viewport on graphic grid 
-		this.grid;
-		this.cellsize;
-		this.gridW;
+		this.grid;//graphic
+		this.cellsize;//graphic
+		this.gridW;//graphic
+		this.mapWidth;
 		this.subGridX;
 		this.subGridY;
 		this.subGridXMax;
 		this.subGridYMax;
 
+		this.lineWidth = 4;
+		this.lineColor = 0x000000;
+		this.lineOpacity = 0.3;
+
 		this.backgroundColor = 0xfffff9;//decided based on client options
 		this.visualCellSize = 200;//optimize. unnecessary distinction? just make it cellSize?
+		this.playerMapWidth = 1000; //?? todo. how to determine playermap size?
+		this.playerMap;
 
 		if(debug) console.assert(this.canvas instanceof HTMLElement);
 
@@ -60,12 +67,184 @@
 	}
 
 	//store graphic related info from map. called on client init
-	Camera.prototype.setMapInfo = function (grid, cellSizeg, gridWg){//todo. awkward. try to not let camera have map. but updateing zones/obstacles children need graphic grid ??
+	Camera.prototype.setMapInfo = function (grid, cellSizeg, gridWg, mapWidth){//todo. awkward. try to not let camera have map. but updateing zones/obstacles children need graphic grid ??
 		this.grid = grid;
 		this.cellSize = cellSizeg;
 		this.gridW = gridWg;
+		this.mapWidth = mapWidth;
 
 		this.createVisualGrid();//todo. put it here for now. should be called whenever view changes dimension
+	}
+
+	Camera.prototype.createPlayerMap = function(zones, obstacles){
+		if(debug) console.assert(zones && obstacles);
+
+		const cellSize = this.cellSize;
+
+		const playerMap = document.createElement('canvas');
+		const ctx = playerMap.getContext('2d');
+
+		const playerMapWidth = this.playerMapWidth;
+		const playerMapScale = playerMapWidth / this.mapWidth;
+		playerMap.height = playerMapWidth;
+		playerMap.width = playerMapWidth;
+		const playerMapCellSize = cellSize * playerMapScale;
+
+		ctx.save();
+		ctx.fillStyle = this.backgroundColor;
+    ctx.fillRect(0, 0, playerMapWidth, playerMapWidth);
+    
+    zones.forEach(zone => {
+      this.drawMini(zone, ctx, playerMapScale);
+    });
+
+    //draw lines on top of zones
+    ctx.save();
+    ctx.strokeStyle = this.lineColor;
+    ctx.globalAlpha = this.lineOpacity;
+    ctx.lineWidth = this.lineWidth;
+    ctx.beginPath();
+		for (let x = 0; x < playerMapWidth; x += playerMapCellSize) {
+      ctx.moveTo(x, 0);
+			ctx.lineTo(x, playerMapWidth);
+    }
+    for (let y = 0; y < playerMapWidth; y += playerMapCellSize) {
+      ctx.moveTo(0, y);
+			ctx.lineTo(playerMapWidth, y);
+    }
+    ctx.stroke();
+    ctx.closePath();
+    ctx.restore();
+
+    obstacles.forEach(obj => {
+      //if(debug) console.log(`render obstacles: obstacles length: ${obstacles.size} x: ${obj.x} y: ${obj.y}`);
+      this.drawMini(obj, ctx, playerMapScale);
+    });
+
+    this.playerMap = playerMap; 
+
+    if(debug) console.log(`createPlayerMap: ${cellSize} ${playerMapWidth} ${playerMapScale} ${zones.size} ${obstacles.size}`);
+
+	}
+	Camera.prototype.drawPlayerMap = function(self, context, viewWidth, viewHeight){
+		if(debug) console.assert(self && context && viewWidth && viewHeight);
+		//determine size of player map
+		let width, x, y;
+		if(viewWidth > viewHeight){
+			width = viewHeight;
+			x = Math.round(viewWidth / 2 - width / 2); 
+			y = 0;
+		}
+		else{
+			width = viewWidth;
+			x = 0; 
+			y = Math.round(viewHeight / 2 - width / 2);
+		}
+
+		//if(debug) console.log(`map render uppermap: width: ${this.upperMap.width} height: ${this.upperMap.height}`);
+		//draw static background
+		context.drawImage(this.playerMap, x, y, width, width);
+
+		const scale = width / this.mapWidth;
+		
+		//draw moving markers. 
+		//Self
+		const x0 = Math.round(self.x * scale) + x;
+		const y0 = Math.round(self.y * scale) + y;
+		if(debug) console.assert(self.color && x0 && y0);
+		this.drawMarker(context, self.color, x0, y0);
+
+		if(debug) console.log(`drawPlayerMap: ${x} ${y} ${width} ${this.playerMap.width}`);
+	}
+	//the always present mini map in the corner
+	Camera.prototype.drawMiniMap = function(self, context, viewWidth, viewHeight){
+		if(debug) console.assert(self && context && viewWidth && viewHeight);
+		
+		if(!this.playerMap) return;//if playermap is not finished loading
+
+		//?? todo. accomodate different sizes of canvas, scale
+		//determine size and location on screen
+		const dWidth = 190;//magic numbers. size of minimap on screen
+		const dx = 20;
+		const dy = viewHeight - 20 - dWidth;
+
+		//minimap stagedrop
+		context.fillStyle = 'black';
+		context.fillRect(dx - 3, dy - 3, dWidth + 6, dWidth + 6);
+		
+		//determine size and location to crop out of player map
+		const pMap = this.playerMap;
+		const sWidth = Math.round(pMap.width / 6);//magic number. how much of pMap to take.
+		const scale = pMap.width / this.mapWidth;
+		const sx = (self.x * scale - sWidth / 2);
+		const sy = (self.y * scale - sWidth / 2);
+		context.drawImage(pMap, sx, sy, sWidth, sWidth, dx, dy, dWidth, dWidth);
+
+		//draw self
+		const x0 = dx + dWidth / 2;
+		const y0 = dy + dWidth / 2;
+		if(debug) console.assert(self.color);
+		this.drawMarker(context, self.color, x0, y0);
+	}
+	//kind of a helper function for drawing on player map. ?? where best to put it
+	Camera.prototype.drawMarker = function(context, color, x, y){
+		context.fillStyle = color;
+		context.strokeStyle = 'black';
+		context.lineWidth = 2;
+		context.beginPath();
+		context.arc(x, y, 5, 0, 2 * PI);
+		context.fill();
+		context.stroke();
+		context.closePath();
+		context.strokeStyle = 'white';
+		context.beginPath();
+		context.arc(x, y, 8, 0, 2 * PI);
+		context.stroke();
+		context.closePath();
+	}
+	Camera.prototype.drawMini = function(obj, ctx, scale){
+		if(debug) console.assert(obj.shape !== undefined || obj.oType !== undefined);
+
+		//testing. change after all obstacles are single object
+		if(obj.oType !== undefined){
+			//if(debug) console.log(`drawMini: obstacle passed in: otype: ${obj.oType}`);
+			obj = obj.parts.entries().next().value[1];
+			//if(debug) console.log(obj);
+			if(debug) console.assert(obj.color);
+		}
+
+		const x = Math.round(obj.x * scale);
+		const y = Math.round(obj.y * scale);
+		ctx.save();
+		ctx.translate(x, y);
+		ctx.rotate(obj.angle);
+		ctx.fillStyle = obj.color;
+		switch(obj.shape){
+
+			case(Game.enums.Shape.rectangle):
+			const width = Math.round(obj.width * scale);
+			const height = Math.round(obj.height * scale);
+			ctx.fillRect(x - Math.round(width / 2), y - Math.round(width / 2), width, height);
+			break;
+
+			case(Game.enums.Shape.circle):
+			ctx.beginPath();
+			ctx.arc(Math.round(obj.x * scale), Math.round(obj.y * scale), Math.round(obj.radius * scale), 0, 2 * PI);
+			ctx.fill();
+			ctx.closePath();
+			break;
+
+			case(Game.enums.Shape.point):
+			ctx.beginPath();
+			ctx.arc(Math.round(obj.x * scale), Math.round(obj.y * scale), Math.round(obj.radius * scale), 0, 2 * PI);
+			ctx.fill();
+			ctx.closePath();
+			break;
+			//no need for line
+			default:
+			if(debug) console.log(`drawMini: no matching shape: ${obj.shape}`);
+		}
+		ctx.restore();
 	}
 	//first called right after mapinfo then whenever viewport dimension changes
 	Camera.prototype.createVisualGrid = function(){
@@ -80,9 +259,9 @@
 
 		const wCount = Math.ceil(this.wView / this.visualCellSize) + 1;
 		const hCount = Math.ceil(this.hView / this.visualCellSize) + 1;
-		const thickness = 4;
-		const color = 0x000000;
-		const opacity = 0.3;
+		const thickness = this.lineWidth;
+		const color = this.lineColor;
+		const opacity = this.lineOpacity;
 
 		//if(debug) console.log(`createVisualGrid: wCount: ${wCount} hCount: ${hCount}`);
 
@@ -140,7 +319,7 @@
 			break;
 
 			default:
-			if(debug) console.log(`createSprite: no matching shape`);
+			//if(debug) console.log(`createSprite: no matching shape`);
 			if(debug) console.assert(obj.color && obj.radius);
 			sprite = this.createSpriteCirc(obj.color, obj.radius);
 		}
@@ -258,8 +437,8 @@
 		const oldYView = this.yView;
 		this.xView = this.followed.x - this.xDeadZone;
 		this.yView = this.followed.y - this.yDeadZone;
-		this.dx = this.xView - oldXView;
-		this.dy = this.yView - oldYView;
+		this.dx = Math.round(this.xView - oldXView);
+		this.dy = Math.round(this.yView - oldYView);
 
 	}
 

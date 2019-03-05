@@ -85,7 +85,6 @@
 			//graphics related
 			this.showMap = false;
 			this.showMiniMap = true;
-			this.upperMap;//to be created by map
 			this.gtoggledObstacles = new Set();//list of obstacles that toggle graphics due to players zones occupation
 
 			//fetch viewport canvas and Adjust its size
@@ -178,11 +177,11 @@
 		//init map
 		this.map = new Game.Land(this.instance.width, this.instance.height, this.instance.cellSize);
     this.map.addCamera(this.camera);//testing
-    this.camera.setMapInfo(this.map.gridgUpper, this.map.cellSizeg, this.map.gridWg);
+    this.camera.setMapInfo(this.map.gridgUpper, this.map.cellSizeg, this.map.gridWg, this.map.width);
 		
 		this.generateMap(this.instance.mapSeed);
 		//if(debug) console.log(`map generate time: ${Date.now() - start0}`);
-		this.upperMap = this.map.render(this.obstacles); //generate background graphics
+		this.camera.createPlayerMap(this.map.zones, this.obstacles); //generate background graphics
 		
 		//if(debug) console.log(`initGame changedObjs length: ${serverResponse.objects.length}`)
 		//if(debug) console.log(serverResponse.objects);
@@ -333,7 +332,7 @@
 		if(debug) console.assert(width && height);
 
 		//terrian goes first and does not check for collision
-		this.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
+		//this.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
 
 		//complexes, get big ones first
 		//argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, cType 
@@ -352,7 +351,7 @@
 		//argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, oType 
 		let templatesUpper = [//upper ground
 			[0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
-			[50, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
+			[5, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
 			[0, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance],
@@ -514,7 +513,7 @@
 		this.obstacles.set(oID, obj);
 
 		//if(debug && obj.oType === Game.enums.OType.bush) console.log(`addobstacle: oType: ${obj.oType} zones length: ${obj.zones.length}`);
-		//if(debug) console.log(`addobstacle: oid: ${obj.oID} cellsg length: ${cellsgCount} x: ${obj.x} y: ${obj.y}`);
+		//if(debug) console.log(`addobstacle: oid: ${obj.oID} x: ${obj.x} y: ${obj.y} radius: ${obj.parts.get(Game.enums.OPType.rock).radius}`);
 		
 		return 0;
 	}
@@ -836,7 +835,7 @@
 				//if(debug) console.log('new fire: fID: ' + fire.fID);
 			}
 
-			this.camera.update();//update camera coords right after self update. otherwise coors don't synchronize and jitter happens	
+			//this.camera.update();//update camera coords right after self update. otherwise coors don't synchronize and jitter happens	
 	
 	}; //game_core.client_onserverupdate_received
 	
@@ -847,7 +846,12 @@
 		const ctx = this.ctx;
 		//todo. scale?
 		//?? where should camera.update be called?
-		
+
+		const oldTime = this.updateTime;
+		this.updateTime = Date.now();
+		//if(debug) console.log(`update rate: ${1000 / (this.updateTime - oldTime)} updates/sec`);
+
+		this.camera.update();
 		this.camera.drawGame();
 	
 			//Capture inputs from the player
@@ -863,9 +867,9 @@
 		}
 
 		//always draw minimap
-		if(this.showMiniMap) this.drawMiniMap(ctx, width, height);
+		if(this.showMiniMap) this.camera.drawMiniMap(this.self, ctx, width, height);
 		//player map, mini map and stats don't care about scale. 
-		if(this.showMap) this.drawPlayerMap(ctx, width, height);
+		if(this.showMap) this.camera.drawPlayerMap(this.self, ctx, width, height);
 		//draw stats ?? integrate into camera?
 		this.drawStats(ctx, width, height);
 		
@@ -882,6 +886,7 @@
 		/**
 		 * todotodo.
 		 * 
+		 * playermap and minimap
 		 * complex's obs don't have spirtes because it skips add obstacle and go straight to obstacle construct. fix this when obstacles all become single objects.
 		 * incorporate sprite creation to adding stuff
 		 * player color from form is # hex format, need to translate into 0x for pixi
@@ -931,60 +936,6 @@
 		}*/
 
 	}  
-	game_core.prototype.drawPlayerMap = function(context, viewWidth, viewHeight){
-		//determine size of player map
-		let width, x, y;
-		if(viewWidth > viewHeight){
-			width = viewHeight;
-			x = Math.round(viewWidth / 2 - width / 2); 
-			y = 0;
-		}
-		else{
-			width = viewWidth;
-			x = 0; 
-			y = Math.round(viewHeight / 2 - width / 2);
-		}
-
-		//if(debug) console.log(`map render uppermap: width: ${this.upperMap.width} height: ${this.upperMap.height}`);
-		//draw static background
-		context.drawImage(this.upperMap, x, y, width, width);
-
-		const scale = width / this.map.width;
-		
-		//draw moving markers. 
-		//Self
-		const x0 = (this.self.x * scale) + x;
-		const y0 = (this.self.y * scale) + y;
-		this.drawMarker(context, this.self.color, x0, y0);
-	}
-	//the always present mini map in the corner
-	game_core.prototype.drawMiniMap = function(context, viewWidth, viewHeight){
-		
-		if(!this.upperMap) return;//if playermap is not finished loading
-
-		//todo. accomodate different sizes of canvas, scale
-		//determine size and location on screen
-		const dWidth = 190;//magic numbers. size of minimap on screen
-		const dx = 20;
-		const dy = viewHeight - 20 - dWidth;
-
-		//minimap stagedrop
-		context.fillStyle = 'black';
-		context.fillRect(dx - 3, dy - 3, dWidth + 6, dWidth + 6);
-		
-		//determine size and location to crop out of player map
-		const pMap = this.upperMap;
-		const sWidth = Math.round(pMap.width / 6);//magic number. how much of pMap to take.
-		const scale = pMap.width / this.map.width;
-		const sx = (this.self.x * scale - sWidth / 2);
-		const sy = (this.self.y * scale - sWidth / 2);
-		context.drawImage(pMap, sx, sy, sWidth, sWidth, dx, dy, dWidth, dWidth);
-
-		//draw self
-		const x0 = dx + dWidth / 2;
-		const y0 = dy + dWidth / 2;
-		this.drawMarker(context, this.self.color, x0, y0);
-	}
 	game_core.prototype.drawStats = function(ctx, viewWidth, viewHeight){
 		
 		//if(debug) console.log('drawstats: this.self.pID: ' + this.self.pID + ' health: ' + this.self.health);
@@ -996,22 +947,6 @@
 		ctx.font = '36px serif';
 		ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
 		ctx.fillText(health, x, y);
-	}
-	//kind of a helper function for drawing on player map. ?? where best to put it
-	game_core.prototype.drawMarker = function(context, color, x, y){
-		context.fillStyle = color;
-		context.strokeStyle = 'black';
-		context.lineWidth = 2;
-		context.beginPath();
-		context.arc(x, y, 5, 0, 2 * PI);
-		context.fill();
-		context.stroke();
-		context.closePath();
-		context.strokeStyle = 'white';
-		context.beginPath();
-		context.arc(x, y, 8, 0, 2 * PI);
-		context.stroke();
-		context.closePath();
 	}
 	
 	game_core.prototype.client_create_ping_timer = function() {

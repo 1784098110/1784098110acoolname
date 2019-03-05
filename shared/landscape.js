@@ -93,17 +93,6 @@
     return this.jidCounter++; 
   
   }
-
-  Land.prototype.addTerrian = function(obj){
-    //todo.add all kinds of terrians before any object/zone. so there's no collide check
-
-    //todo. Some terrians might be incompatible, might need collide check after all
-    obj.zones.forEach(zone => {
-      this.addZone(zone);
-    });
-    obj.generator = undefined;
-
-  }
   //zones are permanent
   Land.prototype.addZone = function(obj){
     //zones can be rotated rectangles
@@ -482,17 +471,46 @@
     return false;
 
   }
-  //simply returns if there's a collision, including world bound. used in obstacle generation
-  Land.prototype.checkCollides = function(obj){//?? repeating from handlecollides. 
-    
-    if(obj.checkBoundary()) return true; 
+  //combine add object, checkcollides, and remove object
+  Land.prototype.checkPlaceHolder = function(obj){
 
-    const grid = (obj.upperGround === true) ? this.gridUpper : this.gridUnder;
-    const lastCheck = [];
+    const grid = this.gridUpper;
+    const cells = obj.cells;
+    let collide = false;
+    const x = (obj.x);
+    const y = (obj.y);
+
+    obj.jID = this.createJID();
+
+    //grid coors of the bounds of obj
+    let x1, y1, x2, y2;
+    //determine object size and location based on shape
+    let wh = (obj.width / 2) || obj.radius;
+    let hh = (obj.height / 2) || obj.radius;
+
+    //which cell does the edges of the object occupy
+    x1 = Math.floor((x - wh) / this.cellSize);
+    y1 = Math.floor((y - hh) / this.cellSize);
+    x2 = Math.floor((x + wh) / this.cellSize);
+    y2 = Math.floor((y + hh) / this.cellSize);
+
+    //fill the cells between the ones occupied by object's edges
+    const gridH = this.gridW;
+    for (let i = (x1 > 0 ? x1 : 0), i2 = (x2 < gridH) ? x2 : (gridH - 1); i <= i2; i++){
+      for (let j = (y1 > 0 ? y1 : 0), j2 = (y2 < gridH) ? y2 : (gridH - 1); j <= j2; j++){
+        if(debug && !(grid[i] && grid[i][j])) console.log(':: ERROR: map addobj: !grid[i]: obj.x: ' + obj.x + ' obj.y: ' + obj.y + ' w: ' + w + ' h: ' + h + ' i: ' + i + ' j: ' + j + ' obj.jID: ' + obj.jID);
+        if(debug) console.assert(grid[i][j]);
+
+        grid[i][j].push(obj);
+        obj.cells.push(i * gridH + j);
+      }
+    }
+
+    //Check collides
+    if(obj.checkBoundary()) collide = true; 
 
     //check for collision with all objects in ocupied cells
-    const cells = obj.cells;
-    const gridH = this.gridW;
+    const lastCheck = [];
     let inhabs;
     for(let i = 0, length = cells.length; i < length; i++){
       inhabs = grid[Math.floor(cells[i]/gridH)][cells[i]%gridH];
@@ -506,12 +524,22 @@
         lastCheck[inhab.jID] = true;
 
         if(!inhab.passable && inhab.jID !== obj.jID){
-          if(obj.checkCollide(inhab)) return true;
+          if(obj.checkCollide(inhab)) collide = true;
         } 
       }
     }
 
-    return false;
+    //remove Object
+    let xc, yc;
+
+    for (let i = 0, l = cells.length; i < l; i++){
+      xc = Math.floor(cells[i] / gridH);
+      yc = cells[i] % gridH;
+      grid[xc][yc].splice(grid[xc][yc].indexOf(obj), 1);
+    }
+    obj.cells = [];
+
+    return collide;
   }
   //only checks obj center
   Land.prototype.checkWorldBoundary = function(obj){

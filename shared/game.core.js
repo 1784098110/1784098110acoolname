@@ -641,12 +641,12 @@
 		if(debug) console.assert(width && height);
 
 		//terrian goes first and does not check for collision
-		this.map.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
+		//this.addTerrian(new Game.Terrian(0, 0, width, height, Game.enums.TType.river, generator, true));
 
 		//complexes, get big ones first
 		//argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, cType 
 		let complexTemplatesUpper = [//upper ground
-			[1, 200, width - 200, 200, height - 200, Game.enums.CType.bushFence]
+			[0, 200, width - 200, 200, height - 200, Game.enums.CType.bushFence]
 		];
 		complexTemplatesUpper.forEach((template) => {
 			let count = template[0];
@@ -660,22 +660,13 @@
 		//argument: count, minSize, maxSize, xMin, xMax, yMin, yMax, oType 
 		let templatesUpper = [//upper ground
 			[0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
-			[10, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
-			[10, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
-			[10, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
+			[5, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
+			[0, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
+			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance],
 			[0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
-			[20, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
-		];
-		/*no under for now
-		let templatesUnder = [//under ground not implemented right now. todo. just make them special houses?
-			[0, 80, 80, 540, 440, 360, 360, Game.enums.OType.entrance],
-			[0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],
-			[0, 60, 120, 100, width - 100, 100, height - 100, Game.enums.OType.rock],
-			[0, 100, 400, 100, width - 100, 100, height - 100, Game.enums.OType.house],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.tree],
 		];
-		*/
 
 		let tooManyCollideCounterUpper = 0;
 		//let tooManyCollideCounterUnder = 0;
@@ -686,15 +677,6 @@
 				tooManyCollideCounterUpper += this.addObstacle(undefined, ...template, true, generator, 0);//find a place for it on map then create obstacle
 			} 
 		});
-		/*
-		templatesUnder.forEach((template) => {
-			let count = template[0];
-			template.splice(0, 1);//take out count when passing in to obstacle constructor
-			for(let i = 0; i < count; i ++){
-				tooManyCollideCounterUnder += this.addObstacle(undefined, ...template, false, generator, 0);//find a place for it on map then create obstacle
-			} 
-		});
-		*/
 
 		if(debug) console.log(`generateMap: instances of too many failed fittings: ${tooManyCollideCounterUpper} obstacles count: ${this.obstacles.size}`);
 	}
@@ -703,7 +685,6 @@
 
 		//count how many times have tried to fit one obstacle. 
 		if(count === undefined) count = 0;
-		let collide = false;
 
 		//generate new coor within bound
 		const x = Math.round(generator.random() * (xMax - xMin)) + xMin;
@@ -735,9 +716,8 @@
 		else if(width !== undefined) placeHolder = new Game.Rectangle(width, height, x, y, false, undefined);
 		placeHolder.upperGround = upperGround;
 		placeHolder.gList = Game.enums.GList.obstacle;
-		this.map.addObject(placeHolder);
-		if(this.map.checkCollides(placeHolder) || this.map.checkZones(placeHolder)) collide = true;
-		this.map.removeObject(placeHolder);
+		
+		const collide = this.map.checkPlaceHolder(placeHolder);
 
 		if(collide){//start over if doesn't fit
 			if(++count > 5){//magic number
@@ -773,6 +753,15 @@
 		
 		return 0;
 	}
+
+	game_core.prototype.addTerrian = function(terrian){
+    //todo. Some terrians might be incompatible, might need collide check after all
+    terrian.zones.forEach(zone => {
+      this.map.addZone(zone);
+    });
+    terrian.generator = undefined;
+  }
+
 	//add one obstacle object based on passed in template and pseudorandom num generator, also make sure no collides
 	game_core.prototype.addObstacle = function(angle, minSize, maxSize, xMin, xMax, yMin, yMax, oType, upperGround, generator, count){
 
@@ -805,23 +794,8 @@
 		}
 		else if(debug) console.log(` ::ERROR:: addobstacle no matching oType: ${oType}`);
 		
-		/*todo. not needed for now
-		if((width !== undefined) && (width !== height)){//a circle or square has no resizing
-			//if(debug) console.log('addcomplex adjust parts angle not square: angle: ' + this.angle);
-			if((Math.abs(angle - PI / 2) < 0.1) || (Math.abs(angle - 3 * PI / 2) < 0.1)){
-				//if(debug) console.log(`addcomplex adjust angled parts: x: ${part.x} y: ${part.y} w: ${part.width} h: ${part.height} angle: ${part.angle}`);
-				[width, height] = [height, width];  
-
-			} 
-		}*/
-		
-		//plug in map to see if no collide
-		let collide = false;
-		placeHolder.upperGround = upperGround;
-		placeHolder.gList = Game.enums.GList.obstacle;
-		this.map.addObject(placeHolder);
-		if(this.map.checkCollides(placeHolder) || this.map.checkZones(placeHolder)) collide = true;
-		this.map.removeObject(placeHolder);
+		//plug in map to see if no collide	
+		const collide = this.map.checkPlaceHolder(placeHolder);
 
 		if(collide){//start over if doesn't fit
 			if(++count > 5){//magic number
@@ -846,7 +820,7 @@
 		this.obstacles.set(oID, obj);
 
 		//if(debug && obj.oType === Game.enums.OType.bush) console.log(`addobstacle: oType: ${obj.oType} zones length: ${obj.zones.length}`);
-		//if(debug) console.log(`addobstacle: oid: ${obj.oID} cellsg length: ${cellsgCount} x: ${obj.x} y: ${obj.y}`);
+		//if(debug) console.log(`addobstacle: oid: ${obj.oID} x: ${obj.x} y: ${obj.y} radius: ${obj.parts.get(Game.enums.OPType.rock).radius}`);
 		
 		return 0;
 	}

@@ -278,6 +278,9 @@ window.onload = function(){
 		
 		if(e.button === 0)game.controls.lWeapon = false;
 		else if(e.button === 2)game.controls.rWeapon = false;	
+
+		if(debug) console.log(`mouse world position: x: ${game.camera.xView + game.controls.mouseX} y: ${game.camera.yView + game.controls.mouseY}`);
+
 	}, false);
 
 	//menu buttons
@@ -296,4 +299,3 @@ window.onload = function(){
 
 
 })();
-
