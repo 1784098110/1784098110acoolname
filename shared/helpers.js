@@ -229,4 +229,9 @@ window.helpers = {};
     return stats;
   }
 
+  //number format
+  helpers.decToHexPound = function(dec){
+    return '#' + dec.toString(16);
+  }
+
 })();

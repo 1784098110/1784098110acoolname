@@ -352,7 +352,7 @@
 		let templatesUpper = [//upper ground
 			[0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
 			[5, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
-			[0, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
+			[5, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance],
 			[0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
@@ -371,6 +371,7 @@
 
 		if(debug) console.log(`generateMap: instances of too many failed fittings: ${tooManyCollideCounterUpper} obstacles count: ${this.obstacles.size}`);
 	}
+
 	//add one complex(specific arrangements of obstacles) based on passed in template and pseudorandom num generator, also make sure no collides
 	game_core.prototype.addComplex = function(angle, xMin, xMax, yMin, yMax, cType, upperGround, generator, count){
 
@@ -441,7 +442,6 @@
 
 		//if(debug && obj.oType === Game.enums.OType.bush) console.log(`addobstacle: oType: ${obj.oType} zones length: ${obj.zones.length}`);
 		//if(debug) console.log(`addobstacle: oid: ${obj.oID} cellsg length: ${cellsgCount} x: ${obj.x} y: ${obj.y}`);
-		
 		return 0;
 	}
 
@@ -879,6 +879,8 @@
 		//this.client_update_local_position(); 
 	
 	}//game_core.update_client
+
+	//delete
 	//?? iterating through same gridsg two times to draw zones and obstacles separately. anyway to optimize?
 	//only draw ones in graphic grids occupied by the viewport
 	game_core.prototype.drawObstacles = function(context, xView, yView, scale, subGridX, subGridY, subGridXMax, subGridYMax){
@@ -886,7 +888,8 @@
 		/**
 		 * todotodo.
 		 * 
-		 * playermap and minimap
+		 * obstacles pop up too late almost randomly (maybe according to gridg??)
+		 * fix grid location. not based on player but to fit in map
 		 * complex's obs don't have spirtes because it skips add obstacle and go straight to obstacle construct. fix this when obstacles all become single objects.
 		 * incorporate sprite creation to adding stuff
 		 * player color from form is # hex format, need to translate into 0x for pixi
@@ -909,32 +912,6 @@
 		 * Does big index affect performance? how to utilize typed arrays?
 		 * Rectangles can overlap with rocks. due to rotation? but in real game won't have rotation right
 		 */
-		/*
-		const obstacles = this.obstacles;
-		const grid = this.self.upperGround ? this.map.gridgUpper : this.map.gridgUnder;
-		const rID = Game.rIDCounter++;
-
-		//iterating occupied graphic grid to get relevant obstacles to draw
-		for(let g = Game.enums.GList.obstacle; g <= Game.enums.GList.treeCrown; g++){
-			for(let i = subGridX; i < subGridXMax; i++){
-				for(let j = subGridY; j < subGridYMax; j++){
-
-					if(debug && (!grid[i] || !grid[i][j])) console.log(`drawObstacles broke: grid: i: ${i} j: ${j}`);
-					grid[i][j][g].forEach(obj => {
-						if(debug) console.assert(obj.oID !== undefined);
-						if(obj.rID === rID) return;//if already drawn
-
-						//some obstacles have different graphics under certain situations
-						let toggle = false;//optimize. don't need to store it
-						if(this.gtoggledObstacles.has(obj.oID)) toggle = true;
-
-						obstacles.get(obj.oID).draw(context, xView, yView, scale, toggle);
-						obj.rID = rID;
-					});
-				}
-			}
-		}*/
-
 	}  
 	game_core.prototype.drawStats = function(ctx, viewWidth, viewHeight){
 		

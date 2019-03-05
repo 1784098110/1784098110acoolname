@@ -35,7 +35,7 @@
 		this.subGridXMax;
 		this.subGridYMax;
 
-		this.lineWidth = 4;
+		this.lineWidth = 2;
 		this.lineColor = 0x000000;
 		this.lineOpacity = 0.3;
 
@@ -79,7 +79,7 @@
 	Camera.prototype.createPlayerMap = function(zones, obstacles){
 		if(debug) console.assert(zones && obstacles);
 
-		const cellSize = this.cellSize;
+		const cellSize = this.visualCellSize;
 
 		const playerMap = document.createElement('canvas');
 		const ctx = playerMap.getContext('2d');
@@ -90,9 +90,10 @@
 		playerMap.width = playerMapWidth;
 		const playerMapCellSize = cellSize * playerMapScale;
 
-		ctx.save();
-		ctx.fillStyle = this.backgroundColor;
-    ctx.fillRect(0, 0, playerMapWidth, playerMapWidth);
+		//ctx.save();
+		ctx.fillStyle = helpers.decToHexPound(this.backgroundColor);
+		ctx.fillRect(0, 0, playerMapWidth, playerMapWidth);
+		//ctx.restore();
     
     zones.forEach(zone => {
       this.drawMini(zone, ctx, playerMapScale);
@@ -100,9 +101,9 @@
 
     //draw lines on top of zones
     ctx.save();
-    ctx.strokeStyle = this.lineColor;
+    ctx.strokeStyle = helpers.decToHexPound(this.lineColor);
     ctx.globalAlpha = this.lineOpacity;
-    ctx.lineWidth = this.lineWidth;
+    ctx.lineWidth = this.lineWidth / 2;
     ctx.beginPath();
 		for (let x = 0; x < playerMapWidth; x += playerMapCellSize) {
       ctx.moveTo(x, 0);
@@ -120,10 +121,11 @@
       //if(debug) console.log(`render obstacles: obstacles length: ${obstacles.size} x: ${obj.x} y: ${obj.y}`);
       this.drawMini(obj, ctx, playerMapScale);
     });
-
+		
     this.playerMap = playerMap; 
 
-    if(debug) console.log(`createPlayerMap: ${cellSize} ${playerMapWidth} ${playerMapScale} ${zones.size} ${obstacles.size}`);
+		if(debug) console.assert(playerMap);
+    //if(debug) console.log(`createPlayerMap end: cellsize: ${cellSize} pmapW: ${playerMapWidth} pmapScale: ${playerMapScale} zones count: ${zones.size} obs count: ${obstacles.size} backColor: ${this.backgroundColor}`);
 
 	}
 	Camera.prototype.drawPlayerMap = function(self, context, viewWidth, viewHeight){
@@ -154,7 +156,7 @@
 		if(debug) console.assert(self.color && x0 && y0);
 		this.drawMarker(context, self.color, x0, y0);
 
-		if(debug) console.log(`drawPlayerMap: ${x} ${y} ${width} ${this.playerMap.width}`);
+		//if(debug) console.log(`drawPlayerMap: x: ${x} y: ${y} w: ${width} pmapW: ${this.playerMap.width}`);
 	}
 	//the always present mini map in the corner
 	Camera.prototype.drawMiniMap = function(self, context, viewWidth, viewHeight){
@@ -169,7 +171,7 @@
 		const dy = viewHeight - 20 - dWidth;
 
 		//minimap stagedrop
-		context.fillStyle = 'black';
+		context.fillStyle = '#000000';
 		context.fillRect(dx - 3, dy - 3, dWidth + 6, dWidth + 6);
 		
 		//determine size and location to crop out of player map
@@ -188,15 +190,15 @@
 	}
 	//kind of a helper function for drawing on player map. ?? where best to put it
 	Camera.prototype.drawMarker = function(context, color, x, y){
-		context.fillStyle = color;
-		context.strokeStyle = 'black';
+		context.fillStyle = helpers.decToHexPound(color);
+		context.strokeStyle = '#000000';
 		context.lineWidth = 2;
 		context.beginPath();
 		context.arc(x, y, 5, 0, 2 * PI);
 		context.fill();
 		context.stroke();
 		context.closePath();
-		context.strokeStyle = 'white';
+		context.strokeStyle = '#ffffff';
 		context.beginPath();
 		context.arc(x, y, 8, 0, 2 * PI);
 		context.stroke();
@@ -205,7 +207,7 @@
 	Camera.prototype.drawMini = function(obj, ctx, scale){
 		if(debug) console.assert(obj.shape !== undefined || obj.oType !== undefined);
 
-		//testing. change after all obstacles are single object
+		//testing. change obstacles to single objects
 		if(obj.oType !== undefined){
 			//if(debug) console.log(`drawMini: obstacle passed in: otype: ${obj.oType}`);
 			obj = obj.parts.entries().next().value[1];
@@ -216,27 +218,27 @@
 		const x = Math.round(obj.x * scale);
 		const y = Math.round(obj.y * scale);
 		ctx.save();
-		ctx.translate(x, y);
-		ctx.rotate(obj.angle);
-		ctx.fillStyle = obj.color;
+		ctx.fillStyle = helpers.decToHexPound(obj.color);
 		switch(obj.shape){
 
 			case(Game.enums.Shape.rectangle):
+			ctx.translate(x, y);
+			ctx.rotate(obj.angle);
 			const width = Math.round(obj.width * scale);
 			const height = Math.round(obj.height * scale);
-			ctx.fillRect(x - Math.round(width / 2), y - Math.round(width / 2), width, height);
+			ctx.fillRect(-Math.round(width / 2), -Math.round(width / 2), width, height);
 			break;
 
 			case(Game.enums.Shape.circle):
 			ctx.beginPath();
-			ctx.arc(Math.round(obj.x * scale), Math.round(obj.y * scale), Math.round(obj.radius * scale), 0, 2 * PI);
+			ctx.arc(x, y, Math.round(obj.radius * scale), 0, 2 * PI);
 			ctx.fill();
 			ctx.closePath();
 			break;
 
 			case(Game.enums.Shape.point):
 			ctx.beginPath();
-			ctx.arc(Math.round(obj.x * scale), Math.round(obj.y * scale), Math.round(obj.radius * scale), 0, 2 * PI);
+			ctx.arc(x, y, Math.round(obj.radius * scale), 0, 2 * PI);
 			ctx.fill();
 			ctx.closePath();
 			break;

@@ -11,6 +11,7 @@
    * somewhere to let game know there's an obstacle???
    * */ 
   function Land(width, height, cellSize) {
+    if(debug) console.log(`Land construct: w: ${width} h: ${height} cellsize: ${cellSize}`);
 		this.width = width; //world not grid size
     this.height = height;
 

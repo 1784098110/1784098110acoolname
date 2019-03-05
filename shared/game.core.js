@@ -661,7 +661,7 @@
 		let templatesUpper = [//upper ground
 			[0, 80, 80, 440, 440, 360, 360, Game.enums.OType.entrance],//testing. specified location for convenience
 			[5, 60, 120, 200, width - 200, 200, height - 200, Game.enums.OType.rock],
-			[0, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
+			[5, 60, 150, 200, width - 200, 200, height - 200, Game.enums.OType.box],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.bush],
 			[0, 30, 80, 100, width - 100, 100, height - 100, Game.enums.OType.entrance],
 			[0, 50, 200, 100, width - 100, 100, height - 100, Game.enums.OType.house],
